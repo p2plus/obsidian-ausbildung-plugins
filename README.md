@@ -45,6 +45,23 @@ What it does not include:
 
 The example vault is intentionally small and artificial. It exists for reproducible tests and screenshots.
 
+## Shared foundation
+
+All plugins in the repo work against the same file-based learning model:
+
+- markdown notes as the primary source
+- YAML front matter for status, review, scoring, and relevance
+- generated markdown outputs instead of hidden proprietary storage
+- optional AI features through BYOK provider settings
+
+The current BYOK layer supports:
+
+- OpenAI
+- OpenRouter
+- custom OpenAI-compatible endpoints
+
+Each plugin keeps a local fallback path. If AI is disabled, a key is missing, or a provider request fails, the plugin should still remain usable.
+
 ## Obsidian stack
 
 These plugins are designed to work alongside an existing Obsidian setup.
@@ -88,6 +105,8 @@ These are the most advanced plugins in the repository, but the repository as a w
 
 Experimental means the plugin is usable, but not yet held to the same release confidence as Tier 1.
 
+These plugins now also include preview flows and BYOK-aware settings, but they should still be treated as WIP until they have seen more manual vault testing.
+
 ## Quality bar
 
 Each plugin is expected to have:
@@ -96,6 +115,7 @@ Each plugin is expected to have:
 - tested core logic
 - a manual QA path against the synthetic vault
 - a sensible fallback when optional plugins like `Dataview` are not present
+- usable settings and preview flows for any feature that writes large outputs
 
 ## Local development
 
@@ -113,3 +133,9 @@ npm run build --workspace lernfortschritt-dashboard
 ```
 
 For manual QA, use the test vault and verify the resulting markdown inside Obsidian.
+
+For AI-backed features, also verify:
+
+- provider connection test
+- visible connection status in settings
+- graceful fallback when the key is removed or the provider is unavailable
