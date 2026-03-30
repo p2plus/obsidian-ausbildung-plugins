@@ -223,7 +223,10 @@ var DEFAULT_BASE_SETTINGS = {
   customApiKey: "",
   customModel: "gpt-4.1-mini",
   customEndpoint: "https://api.openai.com/v1/chat/completions",
-  requestTimeoutMs: 45e3
+  requestTimeoutMs: 45e3,
+  aiConnectionStatus: "unknown",
+  aiConnectionMessage: "No connection test run yet.",
+  aiConnectionTestedAt: ""
 };
 async function scanVault(app, rootFolders) {
   const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
@@ -510,15 +513,30 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
         button.setButtonText("Testing...");
         try {
           const message = await testAiProviderConnection(config);
+          this.plugin.settings.aiConnectionStatus = "ok";
+          this.plugin.settings.aiConnectionMessage = message;
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeSuccess(message);
+          this.display();
         } catch (error) {
+          this.plugin.settings.aiConnectionStatus = "error";
+          this.plugin.settings.aiConnectionMessage = String(error);
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeError(`AI connection test failed: ${String(error)}`);
+          this.display();
         } finally {
           button.setDisabled(false);
           button.setButtonText("Run test");
         }
       })
     );
+    const status = this.plugin.settings.aiConnectionStatus;
+    const statusText = status === "ok" ? `Last test passed. ${this.plugin.settings.aiConnectionMessage}` : status === "error" ? `Last test failed. ${this.plugin.settings.aiConnectionMessage}` : this.plugin.settings.aiConnectionMessage;
+    containerEl.createEl("p", {
+      text: this.plugin.settings.aiConnectionTestedAt ? `${statusText} (${this.plugin.settings.aiConnectionTestedAt})` : statusText
+    });
   }
 };
 
@@ -534,6 +552,11 @@ var SpacedRepetitionEnginePlugin = class extends import_obsidian2.Plugin {
       id: "generate-review-queue",
       name: "Reviews: Faellige Wiederholungen generieren",
       callback: () => void this.generateQueue()
+    });
+    this.addCommand({
+      id: "preview-review-queue",
+      name: "Reviews: Queue Vorschau oeffnen",
+      callback: () => void this.openQueuePreview()
     });
     this.addCommand({
       id: "set-next-review-vergessen",
@@ -564,6 +587,11 @@ var SpacedRepetitionEnginePlugin = class extends import_obsidian2.Plugin {
     await this.saveData(this.settings);
   }
   async generateQueue() {
+    const { markdown, fileName } = await this.buildQueueMarkdown();
+    const path = await writePluginOutput(this.app, this.settings.periodicNotesFolder, fileName, markdown);
+    new import_obsidian2.Notice(`Review Queue geschrieben: ${path}`);
+  }
+  async buildQueueMarkdown() {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const due = scanned.filter((entry) => entry.note.next_review && entry.note.next_review <= today).sort((left, right) => {
@@ -596,9 +624,7 @@ var SpacedRepetitionEnginePlugin = class extends import_obsidian2.Plugin {
       ...enriched.map((entry) => `- [ ] [[${entry.title}]] | Prioritaet ${entry.priority} | ${entry.reason}
   - Prompt: ${entry.recapPrompt}`)
     ].join("\n");
-    const fileName = `${today}-review-queue.md`;
-    const path = await writePluginOutput(this.app, this.settings.periodicNotesFolder, fileName, markdown);
-    new import_obsidian2.Notice(`Review Queue geschrieben: ${path}`);
+    return { markdown, fileName: `${today}-review-queue.md` };
   }
   async scheduleCurrent(rating) {
     const file = this.app.workspace.getActiveFile();
@@ -630,6 +656,9 @@ last_review: "${today}"
     await updateLearningStatus(this.app, file, rating === "leicht" ? "sicher" : rating === "vergessen" ? "gelesen" : "geuebt");
     new import_obsidian2.Notice(`Naechste Wiederholung: ${result.nextReview}`);
   }
+  openQueuePreview() {
+    new ReviewQueueModal(this.app, this).open();
+  }
 };
 var SRSettingsTab = class extends BaseSettingsTab {
   display() {
@@ -642,5 +671,29 @@ var SRSettingsTab = class extends BaseSettingsTab {
         await this.plugin.saveSettings();
       })
     );
+  }
+};
+var ReviewQueueModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  async onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Review Queue Preview" });
+    const preview = contentEl.createEl("pre");
+    preview.setText("Loading...");
+    try {
+      const { markdown, fileName } = await this.plugin["buildQueueMarkdown"]();
+      preview.setText(markdown);
+      const button = contentEl.createEl("button", { text: `Queue speichern als ${fileName}` });
+      button.addEventListener("click", async () => {
+        await this.plugin["generateQueue"]();
+        this.close();
+      });
+    } catch (error) {
+      preview.setText(`Queue konnte nicht erzeugt werden: ${String(error)}`);
+    }
   }
 };

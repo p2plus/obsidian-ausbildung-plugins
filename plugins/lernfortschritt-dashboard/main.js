@@ -209,7 +209,10 @@ var DEFAULT_BASE_SETTINGS = {
   customApiKey: "",
   customModel: "gpt-4.1-mini",
   customEndpoint: "https://api.openai.com/v1/chat/completions",
-  requestTimeoutMs: 45e3
+  requestTimeoutMs: 45e3,
+  aiConnectionStatus: "unknown",
+  aiConnectionMessage: "No connection test run yet.",
+  aiConnectionTestedAt: ""
 };
 async function scanVault(app, rootFolders) {
   const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
@@ -503,15 +506,30 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
         button.setButtonText("Testing...");
         try {
           const message = await testAiProviderConnection(config);
+          this.plugin.settings.aiConnectionStatus = "ok";
+          this.plugin.settings.aiConnectionMessage = message;
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeSuccess(message);
+          this.display();
         } catch (error) {
+          this.plugin.settings.aiConnectionStatus = "error";
+          this.plugin.settings.aiConnectionMessage = String(error);
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeError(`AI connection test failed: ${String(error)}`);
+          this.display();
         } finally {
           button.setDisabled(false);
           button.setButtonText("Run test");
         }
       })
     );
+    const status = this.plugin.settings.aiConnectionStatus;
+    const statusText = status === "ok" ? `Last test passed. ${this.plugin.settings.aiConnectionMessage}` : status === "error" ? `Last test failed. ${this.plugin.settings.aiConnectionMessage}` : this.plugin.settings.aiConnectionMessage;
+    containerEl.createEl("p", {
+      text: this.plugin.settings.aiConnectionTestedAt ? `${statusText} (${this.plugin.settings.aiConnectionTestedAt})` : statusText
+    });
   }
 };
 

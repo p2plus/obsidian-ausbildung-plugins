@@ -1,4 +1,4 @@
-import { Notice, Plugin, Setting } from "obsidian";
+import { Modal, Notice, Plugin, Setting } from "obsidian";
 import { buildQuizAiRequest, generateQuizFromMarkdown, normalizeQuizDraftQuestions, parseLearningNote, QuizDraftQuestion } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, runAiRequest, writePluginOutput } from "@ausbildung/plugin-kit";
 
@@ -27,6 +27,11 @@ export default class QuizGeneratorMarkdownPlugin extends Plugin {
       name: "Quiz: Aus aktueller Notiz erzeugen",
       callback: () => void this.generateFromCurrent()
     });
+    this.addCommand({
+      id: "preview-quiz-generation",
+      name: "Quiz: Vorschau oeffnen",
+      callback: () => void this.openPreview()
+    });
     this.addSettingTab(new QuizSettingsTab(this.app, this));
   }
 
@@ -39,10 +44,16 @@ export default class QuizGeneratorMarkdownPlugin extends Plugin {
   }
 
   private async generateFromCurrent(): Promise<void> {
+    const result = await this.buildQuizFromCurrent();
+    const path = await writePluginOutput(this.app, this.settings.outputFolder, result.fileName, result.markdown);
+    new Notice(`Quiz erzeugt: ${path}`);
+  }
+
+  private async buildQuizFromCurrent(): Promise<{ markdown: string; fileName: string }> {
     const file = this.app.workspace.getActiveFile();
     if (!file) {
       new Notice("Keine aktive Notiz gefunden.");
-      return;
+      throw new Error("Keine aktive Notiz gefunden.");
     }
     const markdown = await this.app.vault.cachedRead(file);
     const note = parseLearningNote(file.path, markdown);
@@ -62,8 +73,7 @@ export default class QuizGeneratorMarkdownPlugin extends Plugin {
         new Notice(`AI-Quizerzeugung fehlgeschlagen, nutze Regelmodus: ${String(error)}`);
       }
     }
-    const path = await writePluginOutput(this.app, this.settings.outputFolder, `${file.basename}-quiz.md`, quizMarkdown);
-    new Notice(`Quiz erzeugt: ${path}`);
+    return { markdown: quizMarkdown, fileName: `${file.basename}-quiz.md` };
   }
 
   private renderAiQuiz(title: string, modulId: string, questions: QuizDraftQuestion[], provider: string, model: string, sourcePath: string): string {
@@ -99,6 +109,10 @@ export default class QuizGeneratorMarkdownPlugin extends Plugin {
       lines.push("");
     });
     return lines.join("\n");
+  }
+
+  private openPreview(): void {
+    new QuizPreviewModal(this.app, this).open();
   }
 }
 
@@ -147,5 +161,33 @@ class QuizSettingsTab extends BaseSettingsTab<QuizSettings> {
             await this.plugin.saveSettings();
           })
       );
+  }
+}
+
+class QuizPreviewModal extends Modal {
+  private plugin: QuizGeneratorMarkdownPlugin;
+
+  constructor(app: Plugin["app"], plugin: QuizGeneratorMarkdownPlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  async onOpen(): Promise<void> {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Quiz Preview" });
+    const preview = contentEl.createEl("pre");
+    preview.setText("Loading...");
+    try {
+      const result = await this.plugin["buildQuizFromCurrent"]();
+      preview.setText(result.markdown);
+      const button = contentEl.createEl("button", { text: `Quiz speichern als ${result.fileName}` });
+      button.addEventListener("click", async () => {
+        await this.plugin["generateFromCurrent"]();
+        this.close();
+      });
+    } catch (error) {
+      preview.setText(String(error));
+    }
   }
 }

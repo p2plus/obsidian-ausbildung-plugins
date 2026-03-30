@@ -1,4 +1,4 @@
-import { Notice, Plugin } from "obsidian";
+import { Modal, Notice, Plugin } from "obsidian";
 import { buildAnalyticsAiRequest, buildAnalyticsReport, calculateDashboardMetrics, normalizeAnalyticsInsight } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
 
@@ -12,6 +12,11 @@ export default class AusbildungsAnalyticsDashboardPlugin extends Plugin {
       name: "Analytics: Bericht generieren",
       callback: () => void this.generateReport()
     });
+    this.addCommand({
+      id: "preview-analytics-report",
+      name: "Analytics: Vorschau oeffnen",
+      callback: () => void this.openPreview()
+    });
     this.addSettingTab(new BaseSettingsTab(this.app, this));
   }
 
@@ -24,6 +29,12 @@ export default class AusbildungsAnalyticsDashboardPlugin extends Plugin {
   }
 
   private async generateReport(): Promise<void> {
+    const result = await this.buildReport();
+    const path = await writePluginOutput(this.app, this.settings.dashboardFolder, "analytics-report.md", result);
+    new Notice(`Analytics-Report geschrieben: ${path}`);
+  }
+
+  private async buildReport(): Promise<string> {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const notes = scanned.map((entry) => entry.note);
     const metrics = calculateDashboardMetrics(notes);
@@ -62,7 +73,38 @@ export default class AusbildungsAnalyticsDashboardPlugin extends Plugin {
         markdown += `\n\n## AI-Hinweis\n- Narrative Zusammenfassung nicht verfuegbar: ${String(error)}`;
       }
     }
-    const path = await writePluginOutput(this.app, this.settings.dashboardFolder, "analytics-report.md", markdown);
-    new Notice(`Analytics-Report geschrieben: ${path}`);
+    return markdown;
+  }
+
+  private openPreview(): void {
+    new AnalyticsPreviewModal(this.app, this).open();
+  }
+}
+
+class AnalyticsPreviewModal extends Modal {
+  private plugin: AusbildungsAnalyticsDashboardPlugin;
+
+  constructor(app: Plugin["app"], plugin: AusbildungsAnalyticsDashboardPlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  async onOpen(): Promise<void> {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Analytics Preview" });
+    const preview = contentEl.createEl("pre");
+    preview.setText("Loading...");
+    try {
+      const markdown = await this.plugin["buildReport"]();
+      preview.setText(markdown);
+      const button = contentEl.createEl("button", { text: "Analytics speichern" });
+      button.addEventListener("click", async () => {
+        await this.plugin["generateReport"]();
+        this.close();
+      });
+    } catch (error) {
+      preview.setText(`Report konnte nicht erzeugt werden: ${String(error)}`);
+    }
   }
 }

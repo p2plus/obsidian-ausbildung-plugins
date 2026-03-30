@@ -1,4 +1,4 @@
-import { Notice, Plugin, Setting } from "obsidian";
+import { Modal, Notice, Plugin, Setting } from "obsidian";
 import { buildReviewPriorityAiRequest, calculateNextReview, normalizeReviewPriority } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, runAiRequest, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
 
@@ -22,6 +22,11 @@ export default class SpacedRepetitionEnginePlugin extends Plugin {
       id: "generate-review-queue",
       name: "Reviews: Faellige Wiederholungen generieren",
       callback: () => void this.generateQueue()
+    });
+    this.addCommand({
+      id: "preview-review-queue",
+      name: "Reviews: Queue Vorschau oeffnen",
+      callback: () => void this.openQueuePreview()
     });
     this.addCommand({
       id: "set-next-review-vergessen",
@@ -55,6 +60,12 @@ export default class SpacedRepetitionEnginePlugin extends Plugin {
   }
 
   private async generateQueue(): Promise<void> {
+    const { markdown, fileName } = await this.buildQueueMarkdown();
+    const path = await writePluginOutput(this.app, this.settings.periodicNotesFolder, fileName, markdown);
+    new Notice(`Review Queue geschrieben: ${path}`);
+  }
+
+  private async buildQueueMarkdown(): Promise<{ markdown: string; fileName: string }> {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const today = new Date().toISOString().slice(0, 10);
     const due = scanned
@@ -92,9 +103,7 @@ export default class SpacedRepetitionEnginePlugin extends Plugin {
       "",
       ...enriched.map((entry) => `- [ ] [[${entry.title}]] | Prioritaet ${entry.priority} | ${entry.reason}\n  - Prompt: ${entry.recapPrompt}`)
     ].join("\n");
-    const fileName = `${today}-review-queue.md`;
-    const path = await writePluginOutput(this.app, this.settings.periodicNotesFolder, fileName, markdown);
-    new Notice(`Review Queue geschrieben: ${path}`);
+    return { markdown, fileName: `${today}-review-queue.md` };
   }
 
   private async scheduleCurrent(rating: Rating): Promise<void> {
@@ -121,6 +130,10 @@ export default class SpacedRepetitionEnginePlugin extends Plugin {
     await updateLearningStatus(this.app, file, rating === "leicht" ? "sicher" : rating === "vergessen" ? "gelesen" : "geuebt");
     new Notice(`Naechste Wiederholung: ${result.nextReview}`);
   }
+
+  private openQueuePreview(): void {
+    new ReviewQueueModal(this.app, this).open();
+  }
 }
 
 class SRSettingsTab extends BaseSettingsTab<SRSettings> {
@@ -138,5 +151,33 @@ class SRSettingsTab extends BaseSettingsTab<SRSettings> {
             await this.plugin.saveSettings();
           })
       );
+  }
+}
+
+class ReviewQueueModal extends Modal {
+  private plugin: SpacedRepetitionEnginePlugin;
+
+  constructor(app: Plugin["app"], plugin: SpacedRepetitionEnginePlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  async onOpen(): Promise<void> {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Review Queue Preview" });
+    const preview = contentEl.createEl("pre");
+    preview.setText("Loading...");
+    try {
+      const { markdown, fileName } = await this.plugin["buildQueueMarkdown"]();
+      preview.setText(markdown);
+      const button = contentEl.createEl("button", { text: `Queue speichern als ${fileName}` });
+      button.addEventListener("click", async () => {
+        await this.plugin["generateQueue"]();
+        this.close();
+      });
+    } catch (error) {
+      preview.setText(`Queue konnte nicht erzeugt werden: ${String(error)}`);
+    }
   }
 }

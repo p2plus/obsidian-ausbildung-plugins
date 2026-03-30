@@ -1,4 +1,4 @@
-import { Plugin, Setting } from "obsidian";
+import { Modal, Plugin, Setting } from "obsidian";
 import { buildKeywordGapAiRequest, computeKeywordCoverage, normalizeKeywordGaps } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
 
@@ -64,6 +64,11 @@ export default class KeywordTrackerPlugin extends Plugin {
       name: "Keywords: Abdeckungsbericht generieren",
       callback: () => void this.generateReport()
     });
+    this.addCommand({
+      id: "preview-keyword-report",
+      name: "Keywords: Vorschau oeffnen",
+      callback: () => void this.openPreview()
+    });
     this.addSettingTab(new KeywordSettingsTab(this.app, this));
   }
 
@@ -76,6 +81,11 @@ export default class KeywordTrackerPlugin extends Plugin {
   }
 
   private async generateReport(): Promise<void> {
+    const markdown = await this.buildReport();
+    await writePluginOutput(this.app, this.settings.dashboardFolder, "keyword-coverage.md", markdown);
+  }
+
+  private async buildReport(): Promise<string> {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const expandedKeywords = this.expandKeywords();
     const coverage = computeKeywordCoverage(scanned, expandedKeywords);
@@ -108,7 +118,7 @@ export default class KeywordTrackerPlugin extends Plugin {
       }
     }
 
-    await writePluginOutput(this.app, this.settings.dashboardFolder, "keyword-coverage.md", markdown);
+    return markdown;
   }
 
   private expandKeywords(): string[] {
@@ -123,5 +133,37 @@ export default class KeywordTrackerPlugin extends Plugin {
       }
     }
     return [...expanded];
+  }
+
+  private openPreview(): void {
+    new KeywordPreviewModal(this.app, this).open();
+  }
+}
+
+class KeywordPreviewModal extends Modal {
+  private plugin: KeywordTrackerPlugin;
+
+  constructor(app: Plugin["app"], plugin: KeywordTrackerPlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  async onOpen(): Promise<void> {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Keyword Coverage Preview" });
+    const preview = contentEl.createEl("pre");
+    preview.setText("Loading...");
+    try {
+      const markdown = await this.plugin["buildReport"]();
+      preview.setText(markdown);
+      const button = contentEl.createEl("button", { text: "Bericht speichern" });
+      button.addEventListener("click", async () => {
+        await this.plugin["generateReport"]();
+        this.close();
+      });
+    } catch (error) {
+      preview.setText(`Bericht konnte nicht erzeugt werden: ${String(error)}`);
+    }
   }
 }

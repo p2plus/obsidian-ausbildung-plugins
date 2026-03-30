@@ -190,7 +190,10 @@ var DEFAULT_BASE_SETTINGS = {
   customApiKey: "",
   customModel: "gpt-4.1-mini",
   customEndpoint: "https://api.openai.com/v1/chat/completions",
-  requestTimeoutMs: 45e3
+  requestTimeoutMs: 45e3,
+  aiConnectionStatus: "unknown",
+  aiConnectionMessage: "No connection test run yet.",
+  aiConnectionTestedAt: ""
 };
 async function scanVault(app, rootFolders) {
   const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
@@ -472,15 +475,30 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
         button.setButtonText("Testing...");
         try {
           const message = await testAiProviderConnection(config);
+          this.plugin.settings.aiConnectionStatus = "ok";
+          this.plugin.settings.aiConnectionMessage = message;
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeSuccess(message);
+          this.display();
         } catch (error) {
+          this.plugin.settings.aiConnectionStatus = "error";
+          this.plugin.settings.aiConnectionMessage = String(error);
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeError(`AI connection test failed: ${String(error)}`);
+          this.display();
         } finally {
           button.setDisabled(false);
           button.setButtonText("Run test");
         }
       })
     );
+    const status = this.plugin.settings.aiConnectionStatus;
+    const statusText = status === "ok" ? `Last test passed. ${this.plugin.settings.aiConnectionMessage}` : status === "error" ? `Last test failed. ${this.plugin.settings.aiConnectionMessage}` : this.plugin.settings.aiConnectionMessage;
+    containerEl.createEl("p", {
+      text: this.plugin.settings.aiConnectionTestedAt ? `${statusText} (${this.plugin.settings.aiConnectionTestedAt})` : statusText
+    });
   }
 };
 
@@ -524,6 +542,11 @@ var KeywordTrackerPlugin = class extends import_obsidian2.Plugin {
       name: "Keywords: Abdeckungsbericht generieren",
       callback: () => void this.generateReport()
     });
+    this.addCommand({
+      id: "preview-keyword-report",
+      name: "Keywords: Vorschau oeffnen",
+      callback: () => void this.openPreview()
+    });
     this.addSettingTab(new KeywordSettingsTab(this.app, this));
   }
   async loadSettings() {
@@ -533,6 +556,10 @@ var KeywordTrackerPlugin = class extends import_obsidian2.Plugin {
     await this.saveData(this.settings);
   }
   async generateReport() {
+    const markdown = await this.buildReport();
+    await writePluginOutput(this.app, this.settings.dashboardFolder, "keyword-coverage.md", markdown);
+  }
+  async buildReport() {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const expandedKeywords = this.expandKeywords();
     const coverage = computeKeywordCoverage(scanned, expandedKeywords);
@@ -566,7 +593,7 @@ var KeywordTrackerPlugin = class extends import_obsidian2.Plugin {
 - Themenanalyse nicht verfuegbar: ${String(error)}`;
       }
     }
-    await writePluginOutput(this.app, this.settings.dashboardFolder, "keyword-coverage.md", markdown);
+    return markdown;
   }
   expandKeywords() {
     const expanded = new Set(this.settings.keywords);
@@ -580,5 +607,32 @@ var KeywordTrackerPlugin = class extends import_obsidian2.Plugin {
       }
     }
     return [...expanded];
+  }
+  openPreview() {
+    new KeywordPreviewModal(this.app, this).open();
+  }
+};
+var KeywordPreviewModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  async onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Keyword Coverage Preview" });
+    const preview = contentEl.createEl("pre");
+    preview.setText("Loading...");
+    try {
+      const markdown = await this.plugin["buildReport"]();
+      preview.setText(markdown);
+      const button = contentEl.createEl("button", { text: "Bericht speichern" });
+      button.addEventListener("click", async () => {
+        await this.plugin["generateReport"]();
+        this.close();
+      });
+    } catch (error) {
+      preview.setText(`Bericht konnte nicht erzeugt werden: ${String(error)}`);
+    }
   }
 };

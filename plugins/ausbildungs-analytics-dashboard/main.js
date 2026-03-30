@@ -225,7 +225,10 @@ var DEFAULT_BASE_SETTINGS = {
   customApiKey: "",
   customModel: "gpt-4.1-mini",
   customEndpoint: "https://api.openai.com/v1/chat/completions",
-  requestTimeoutMs: 45e3
+  requestTimeoutMs: 45e3,
+  aiConnectionStatus: "unknown",
+  aiConnectionMessage: "No connection test run yet.",
+  aiConnectionTestedAt: ""
 };
 async function scanVault(app, rootFolders) {
   const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
@@ -507,15 +510,30 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
         button.setButtonText("Testing...");
         try {
           const message = await testAiProviderConnection(config);
+          this.plugin.settings.aiConnectionStatus = "ok";
+          this.plugin.settings.aiConnectionMessage = message;
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeSuccess(message);
+          this.display();
         } catch (error) {
+          this.plugin.settings.aiConnectionStatus = "error";
+          this.plugin.settings.aiConnectionMessage = String(error);
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeError(`AI connection test failed: ${String(error)}`);
+          this.display();
         } finally {
           button.setDisabled(false);
           button.setButtonText("Run test");
         }
       })
     );
+    const status = this.plugin.settings.aiConnectionStatus;
+    const statusText = status === "ok" ? `Last test passed. ${this.plugin.settings.aiConnectionMessage}` : status === "error" ? `Last test failed. ${this.plugin.settings.aiConnectionMessage}` : this.plugin.settings.aiConnectionMessage;
+    containerEl.createEl("p", {
+      text: this.plugin.settings.aiConnectionTestedAt ? `${statusText} (${this.plugin.settings.aiConnectionTestedAt})` : statusText
+    });
   }
 };
 
@@ -528,6 +546,11 @@ var AusbildungsAnalyticsDashboardPlugin = class extends import_obsidian2.Plugin 
       name: "Analytics: Bericht generieren",
       callback: () => void this.generateReport()
     });
+    this.addCommand({
+      id: "preview-analytics-report",
+      name: "Analytics: Vorschau oeffnen",
+      callback: () => void this.openPreview()
+    });
     this.addSettingTab(new BaseSettingsTab(this.app, this));
   }
   async loadSettings() {
@@ -537,6 +560,11 @@ var AusbildungsAnalyticsDashboardPlugin = class extends import_obsidian2.Plugin 
     await this.saveData(this.settings);
   }
   async generateReport() {
+    const result = await this.buildReport();
+    const path = await writePluginOutput(this.app, this.settings.dashboardFolder, "analytics-report.md", result);
+    new import_obsidian2.Notice(`Analytics-Report geschrieben: ${path}`);
+  }
+  async buildReport() {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const notes = scanned.map((entry) => entry.note);
     const metrics = calculateDashboardMetrics(notes);
@@ -577,7 +605,33 @@ var AusbildungsAnalyticsDashboardPlugin = class extends import_obsidian2.Plugin 
 - Narrative Zusammenfassung nicht verfuegbar: ${String(error)}`;
       }
     }
-    const path = await writePluginOutput(this.app, this.settings.dashboardFolder, "analytics-report.md", markdown);
-    new import_obsidian2.Notice(`Analytics-Report geschrieben: ${path}`);
+    return markdown;
+  }
+  openPreview() {
+    new AnalyticsPreviewModal(this.app, this).open();
+  }
+};
+var AnalyticsPreviewModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  async onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Analytics Preview" });
+    const preview = contentEl.createEl("pre");
+    preview.setText("Loading...");
+    try {
+      const markdown = await this.plugin["buildReport"]();
+      preview.setText(markdown);
+      const button = contentEl.createEl("button", { text: "Analytics speichern" });
+      button.addEventListener("click", async () => {
+        await this.plugin["generateReport"]();
+        this.close();
+      });
+    } catch (error) {
+      preview.setText(`Report konnte nicht erzeugt werden: ${String(error)}`);
+    }
   }
 };

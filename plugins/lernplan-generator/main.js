@@ -163,7 +163,10 @@ var DEFAULT_BASE_SETTINGS = {
   customApiKey: "",
   customModel: "gpt-4.1-mini",
   customEndpoint: "https://api.openai.com/v1/chat/completions",
-  requestTimeoutMs: 45e3
+  requestTimeoutMs: 45e3,
+  aiConnectionStatus: "unknown",
+  aiConnectionMessage: "No connection test run yet.",
+  aiConnectionTestedAt: ""
 };
 async function scanVault(app, rootFolders) {
   const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));

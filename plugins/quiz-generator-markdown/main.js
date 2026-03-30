@@ -220,7 +220,10 @@ var DEFAULT_BASE_SETTINGS = {
   customApiKey: "",
   customModel: "gpt-4.1-mini",
   customEndpoint: "https://api.openai.com/v1/chat/completions",
-  requestTimeoutMs: 45e3
+  requestTimeoutMs: 45e3,
+  aiConnectionStatus: "unknown",
+  aiConnectionMessage: "No connection test run yet.",
+  aiConnectionTestedAt: ""
 };
 async function ensureFolder(app, folderPath) {
   const parts = folderPath.split("/").filter(Boolean);
@@ -489,15 +492,30 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
         button.setButtonText("Testing...");
         try {
           const message = await testAiProviderConnection(config);
+          this.plugin.settings.aiConnectionStatus = "ok";
+          this.plugin.settings.aiConnectionMessage = message;
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeSuccess(message);
+          this.display();
         } catch (error) {
+          this.plugin.settings.aiConnectionStatus = "error";
+          this.plugin.settings.aiConnectionMessage = String(error);
+          this.plugin.settings.aiConnectionTestedAt = (/* @__PURE__ */ new Date()).toISOString();
+          await this.plugin.saveSettings();
           noticeError(`AI connection test failed: ${String(error)}`);
+          this.display();
         } finally {
           button.setDisabled(false);
           button.setButtonText("Run test");
         }
       })
     );
+    const status = this.plugin.settings.aiConnectionStatus;
+    const statusText = status === "ok" ? `Last test passed. ${this.plugin.settings.aiConnectionMessage}` : status === "error" ? `Last test failed. ${this.plugin.settings.aiConnectionMessage}` : this.plugin.settings.aiConnectionMessage;
+    containerEl.createEl("p", {
+      text: this.plugin.settings.aiConnectionTestedAt ? `${statusText} (${this.plugin.settings.aiConnectionTestedAt})` : statusText
+    });
   }
 };
 
@@ -517,6 +535,11 @@ var QuizGeneratorMarkdownPlugin = class extends import_obsidian2.Plugin {
       name: "Quiz: Aus aktueller Notiz erzeugen",
       callback: () => void this.generateFromCurrent()
     });
+    this.addCommand({
+      id: "preview-quiz-generation",
+      name: "Quiz: Vorschau oeffnen",
+      callback: () => void this.openPreview()
+    });
     this.addSettingTab(new QuizSettingsTab(this.app, this));
   }
   async loadSettings() {
@@ -526,10 +549,15 @@ var QuizGeneratorMarkdownPlugin = class extends import_obsidian2.Plugin {
     await this.saveData(this.settings);
   }
   async generateFromCurrent() {
+    const result = await this.buildQuizFromCurrent();
+    const path = await writePluginOutput(this.app, this.settings.outputFolder, result.fileName, result.markdown);
+    new import_obsidian2.Notice(`Quiz erzeugt: ${path}`);
+  }
+  async buildQuizFromCurrent() {
     const file = this.app.workspace.getActiveFile();
     if (!file) {
       new import_obsidian2.Notice("Keine aktive Notiz gefunden.");
-      return;
+      throw new Error("Keine aktive Notiz gefunden.");
     }
     const markdown = await this.app.vault.cachedRead(file);
     const note = parseLearningNote(file.path, markdown);
@@ -549,8 +577,7 @@ var QuizGeneratorMarkdownPlugin = class extends import_obsidian2.Plugin {
         new import_obsidian2.Notice(`AI-Quizerzeugung fehlgeschlagen, nutze Regelmodus: ${String(error)}`);
       }
     }
-    const path = await writePluginOutput(this.app, this.settings.outputFolder, `${file.basename}-quiz.md`, quizMarkdown);
-    new import_obsidian2.Notice(`Quiz erzeugt: ${path}`);
+    return { markdown: quizMarkdown, fileName: `${file.basename}-quiz.md` };
   }
   renderAiQuiz(title, modulId, questions, provider, model, sourcePath) {
     const lines = [
@@ -586,6 +613,9 @@ var QuizGeneratorMarkdownPlugin = class extends import_obsidian2.Plugin {
     });
     return lines.join("\n");
   }
+  openPreview() {
+    new QuizPreviewModal(this.app, this).open();
+  }
 };
 var QuizSettingsTab = class extends BaseSettingsTab {
   display() {
@@ -616,5 +646,29 @@ var QuizSettingsTab = class extends BaseSettingsTab {
         await this.plugin.saveSettings();
       })
     );
+  }
+};
+var QuizPreviewModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  async onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Quiz Preview" });
+    const preview = contentEl.createEl("pre");
+    preview.setText("Loading...");
+    try {
+      const result = await this.plugin["buildQuizFromCurrent"]();
+      preview.setText(result.markdown);
+      const button = contentEl.createEl("button", { text: `Quiz speichern als ${result.fileName}` });
+      button.addEventListener("click", async () => {
+        await this.plugin["generateFromCurrent"]();
+        this.close();
+      });
+    } catch (error) {
+      preview.setText(String(error));
+    }
   }
 };

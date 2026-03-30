@@ -16,6 +16,9 @@ export interface BasePluginSettings {
   customModel: string;
   customEndpoint: string;
   requestTimeoutMs: number;
+  aiConnectionStatus: "unknown" | "ok" | "error";
+  aiConnectionMessage: string;
+  aiConnectionTestedAt: string;
 }
 
 export const DEFAULT_BASE_SETTINGS: BasePluginSettings = {
@@ -32,7 +35,10 @@ export const DEFAULT_BASE_SETTINGS: BasePluginSettings = {
   customApiKey: "",
   customModel: "gpt-4.1-mini",
   customEndpoint: "https://api.openai.com/v1/chat/completions",
-  requestTimeoutMs: 45000
+  requestTimeoutMs: 45000,
+  aiConnectionStatus: "unknown",
+  aiConnectionMessage: "No connection test run yet.",
+  aiConnectionTestedAt: ""
 };
 
 export async function scanVault(app: App, rootFolders: string[]): Promise<Array<{ note: LearningNote; file: TFile; markdown: string }>> {
@@ -441,14 +447,37 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
             button.setButtonText("Testing...");
             try {
               const message = await testAiProviderConnection(config);
+              this.plugin.settings.aiConnectionStatus = "ok";
+              this.plugin.settings.aiConnectionMessage = message;
+              this.plugin.settings.aiConnectionTestedAt = new Date().toISOString();
+              await this.plugin.saveSettings();
               noticeSuccess(message);
+              this.display();
             } catch (error) {
+              this.plugin.settings.aiConnectionStatus = "error";
+              this.plugin.settings.aiConnectionMessage = String(error);
+              this.plugin.settings.aiConnectionTestedAt = new Date().toISOString();
+              await this.plugin.saveSettings();
               noticeError(`AI connection test failed: ${String(error)}`);
+              this.display();
             } finally {
               button.setDisabled(false);
               button.setButtonText("Run test");
             }
           })
       );
+
+    const status = this.plugin.settings.aiConnectionStatus;
+    const statusText =
+      status === "ok"
+        ? `Last test passed. ${this.plugin.settings.aiConnectionMessage}`
+        : status === "error"
+          ? `Last test failed. ${this.plugin.settings.aiConnectionMessage}`
+          : this.plugin.settings.aiConnectionMessage;
+    containerEl.createEl("p", {
+      text: this.plugin.settings.aiConnectionTestedAt
+        ? `${statusText} (${this.plugin.settings.aiConnectionTestedAt})`
+        : statusText
+    });
   }
 }
