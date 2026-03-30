@@ -95,3 +95,6 @@ export function updateYamlField(markdown: string, key: string, value: string | n
   return markdown;
 }
 
+export function parseDateOnly(dateText: string): Date {
+  return new Date(`${dateText}T12:00:00`);
+}

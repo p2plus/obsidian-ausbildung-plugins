@@ -105,40 +105,6 @@ function buildAnalyticsReport(notes) {
   ].join("\n");
 }
 
-// ../../packages/shared-core/src/dashboard.ts
-function calculateDashboardMetrics(notes, today = /* @__PURE__ */ new Date()) {
-  const byStatus = {};
-  const byYear = {};
-  const weakModules = /* @__PURE__ */ new Map();
-  let dueReviews = 0;
-  for (const note of notes) {
-    const statusKey = note.lernstatus ?? note.status ?? "unbekannt";
-    const yearKey = note.ausbildungsjahr ?? "ohne-jahr";
-    byStatus[statusKey] = (byStatus[statusKey] ?? 0) + 1;
-    byYear[yearKey] = (byYear[yearKey] ?? 0) + 1;
-    if (typeof note.score_last === "number" && note.modul_id) {
-      const current = weakModules.get(note.modul_id) ?? { total: 0, count: 0 };
-      current.total += note.score_last;
-      current.count += 1;
-      weakModules.set(note.modul_id, current);
-    }
-    if (note.next_review && new Date(note.next_review) <= today) {
-      dueReviews += 1;
-    }
-  }
-  return {
-    total: notes.length,
-    byStatus,
-    byYear,
-    dueReviews,
-    weakModules: [...weakModules.entries()].map(([modulId, value]) => ({
-      modulId,
-      averageScore: Math.round(value.total / value.count),
-      count: value.count
-    })).sort((left, right) => left.averageScore - right.averageScore).slice(0, 5)
-  };
-}
-
 // ../../packages/shared-core/src/notes.ts
 var FRONTMATTER_DELIMITER = "---";
 function parseScalarValue(raw) {
@@ -208,11 +174,48 @@ function parseLearningNote(path, markdown) {
     tags: Array.isArray(fm.tags) ? fm.tags.map(String) : void 0
   };
 }
+function parseDateOnly(dateText) {
+  return /* @__PURE__ */ new Date(`${dateText}T12:00:00`);
+}
+
+// ../../packages/shared-core/src/dashboard.ts
+function calculateDashboardMetrics(notes, today = /* @__PURE__ */ new Date()) {
+  const byStatus = {};
+  const byYear = {};
+  const weakModules = /* @__PURE__ */ new Map();
+  let dueReviews = 0;
+  for (const note of notes) {
+    const statusKey = note.lernstatus ?? note.status ?? "unbekannt";
+    const yearKey = note.ausbildungsjahr ?? "ohne-jahr";
+    byStatus[statusKey] = (byStatus[statusKey] ?? 0) + 1;
+    byYear[yearKey] = (byYear[yearKey] ?? 0) + 1;
+    if (typeof note.score_last === "number" && note.modul_id) {
+      const current = weakModules.get(note.modul_id) ?? { total: 0, count: 0 };
+      current.total += note.score_last;
+      current.count += 1;
+      weakModules.set(note.modul_id, current);
+    }
+    if (note.next_review && parseDateOnly(note.next_review) <= today) {
+      dueReviews += 1;
+    }
+  }
+  return {
+    total: notes.length,
+    byStatus,
+    byYear,
+    dueReviews,
+    weakModules: [...weakModules.entries()].map(([modulId, value]) => ({
+      modulId,
+      averageScore: Math.round(value.total / value.count),
+      count: value.count
+    })).sort((left, right) => left.averageScore - right.averageScore).slice(0, 5)
+  };
+}
 
 // ../../packages/plugin-kit/src/index.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_BASE_SETTINGS = {
-  rootFolders: ["000_Ausbildung_Industriekaufmann_2026", "quizzes"],
+  rootFolders: [],
   dashboardFolder: "_plugin_outputs",
   periodicNotesFolder: "Periodic/Daily",
   useDataview: true,
@@ -231,7 +234,8 @@ var DEFAULT_BASE_SETTINGS = {
   aiConnectionTestedAt: ""
 };
 async function scanVault(app, rootFolders) {
-  const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
+  const normalizedRoots = rootFolders.map((entry) => entry.trim()).filter(Boolean);
+  const files = app.vault.getMarkdownFiles().filter((file) => normalizedRoots.length === 0 || normalizedRoots.some((folder) => file.path.startsWith(folder)));
   const results = [];
   for (const file of files) {
     const markdown = await app.vault.cachedRead(file);
@@ -411,7 +415,7 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: this.plugin.manifest.name });
-    new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes.").addText(
+    new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes. Leave empty to scan the whole vault.").addText(
       (text) => text.setValue(this.plugin.settings.rootFolders.join(", ")).onChange(async (value) => {
         this.plugin.settings.rootFolders = value.split(",").map((entry) => entry.trim()).filter(Boolean);
         await this.plugin.saveSettings();

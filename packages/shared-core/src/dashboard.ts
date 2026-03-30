@@ -1,4 +1,5 @@
 import { DashboardMetrics, LearningNote } from "./types";
+import { parseDateOnly } from "./notes";
 
 export function calculateDashboardMetrics(notes: LearningNote[], today = new Date()): DashboardMetrics {
   const byStatus: Record<string, number> = {};
@@ -19,7 +20,7 @@ export function calculateDashboardMetrics(notes: LearningNote[], today = new Dat
       weakModules.set(note.modul_id, current);
     }
 
-    if (note.next_review && new Date(note.next_review) <= today) {
+    if (note.next_review && parseDateOnly(note.next_review) <= today) {
       dueReviews += 1;
     }
   }
@@ -58,4 +59,3 @@ export function renderDashboardMarkdown(metrics: DashboardMetrics): string {
   ];
   return lines.join("\n");
 }
-

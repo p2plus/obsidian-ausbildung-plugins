@@ -13,9 +13,11 @@ import {
   normalizeKeywordGaps,
   normalizeQuizDraftQuestions,
   parseExamMarkdown,
+  parseDateOnly,
   parseLearningNote,
   renderDashboardMarkdown,
-  safeJsonParseWithRepair
+  safeJsonParseWithRepair,
+  updateYamlField
 } from "../src/index";
 
 const demoNote = parseLearningNote(
@@ -106,5 +108,21 @@ FRAGE: Demo?
     expect(buildAnalyticsAiRequest([demoNote], "# Bericht").responseFormat).toBe("json");
     expect(buildKeywordGapAiRequest([{ keyword: "Bilanz", hits: 1, coveredPaths: [] }], [{ path: "a", markdown: "Bilanz" }]).responseFormat).toBe("json");
     expect(safeJsonParseWithRepair<{ ok: boolean }>('noise {"ok": true} tail')?.ok).toBe(true);
+  });
+
+  it("updates yaml fields without duplicating frontmatter", () => {
+    const markdown = `---
+status: "Aktiv"
+---
+
+# Demo`;
+    const updated = updateYamlField(updateYamlField(markdown, "next_review", "2026-03-31"), "last_review", "2026-03-30");
+    expect(updated.match(/^---$/gm)).toHaveLength(2);
+    expect(updated).toContain('next_review: "2026-03-31"');
+    expect(updated).toContain('last_review: "2026-03-30"');
+  });
+
+  it("parses date-only values at local noon", () => {
+    expect(parseDateOnly("2026-03-30").toISOString()).toContain("T");
   });
 });

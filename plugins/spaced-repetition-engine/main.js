@@ -210,7 +210,7 @@ function calculateNextReview(currentDate, rating, previousIntervalDays = 0) {
 // ../../packages/plugin-kit/src/index.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_BASE_SETTINGS = {
-  rootFolders: ["000_Ausbildung_Industriekaufmann_2026", "quizzes"],
+  rootFolders: [],
   dashboardFolder: "_plugin_outputs",
   periodicNotesFolder: "Periodic/Daily",
   useDataview: true,
@@ -229,7 +229,8 @@ var DEFAULT_BASE_SETTINGS = {
   aiConnectionTestedAt: ""
 };
 async function scanVault(app, rootFolders) {
-  const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
+  const normalizedRoots = rootFolders.map((entry) => entry.trim()).filter(Boolean);
+  const files = app.vault.getMarkdownFiles().filter((file) => normalizedRoots.length === 0 || normalizedRoots.some((folder) => file.path.startsWith(folder)));
   const results = [];
   for (const file of files) {
     const markdown = await app.vault.cachedRead(file);
@@ -414,7 +415,7 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: this.plugin.manifest.name });
-    new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes.").addText(
+    new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes. Leave empty to scan the whole vault.").addText(
       (text) => text.setValue(this.plugin.settings.rootFolders.join(", ")).onChange(async (value) => {
         this.plugin.settings.rootFolders = value.split(",").map((entry) => entry.trim()).filter(Boolean);
         await this.plugin.saveSettings();
@@ -644,23 +645,8 @@ var SpacedRepetitionEnginePlugin = class extends import_obsidian2.Plugin {
     const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const result = calculateNextReview(today, rating, 4);
     const content = await this.app.vault.cachedRead(file);
-    let updated = content;
-    if (content.includes("next_review:")) {
-      updated = updated.replace(/^next_review:.*$/m, `next_review: "${result.nextReview}"`);
-    } else {
-      updated = `---
-next_review: "${result.nextReview}"
----
-
-${updated}`;
-    }
-    if (updated.includes("last_review:")) {
-      updated = updated.replace(/^last_review:.*$/m, `last_review: "${today}"`);
-    } else {
-      updated = updated.replace(/^---\n/, `---
-last_review: "${today}"
-`);
-    }
+    let updated = updateYamlField(content, "next_review", result.nextReview);
+    updated = updateYamlField(updated, "last_review", today);
     await this.app.vault.modify(file, updated);
     await updateLearningStatus(this.app, file, rating === "leicht" ? "sicher" : rating === "vergessen" ? "gelesen" : "geuebt");
     new import_obsidian2.Notice(`Naechste Wiederholung: ${result.nextReview}`);

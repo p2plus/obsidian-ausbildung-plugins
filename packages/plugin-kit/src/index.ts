@@ -22,7 +22,7 @@ export interface BasePluginSettings {
 }
 
 export const DEFAULT_BASE_SETTINGS: BasePluginSettings = {
-  rootFolders: ["000_Ausbildung_Industriekaufmann_2026", "quizzes"],
+  rootFolders: [],
   dashboardFolder: "_plugin_outputs",
   periodicNotesFolder: "Periodic/Daily",
   useDataview: true,
@@ -42,7 +42,10 @@ export const DEFAULT_BASE_SETTINGS: BasePluginSettings = {
 };
 
 export async function scanVault(app: App, rootFolders: string[]): Promise<Array<{ note: LearningNote; file: TFile; markdown: string }>> {
-  const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
+  const normalizedRoots = rootFolders.map((entry) => entry.trim()).filter(Boolean);
+  const files = app.vault.getMarkdownFiles().filter((file) => (
+    normalizedRoots.length === 0 || normalizedRoots.some((folder) => file.path.startsWith(folder))
+  ));
   const results: Array<{ note: LearningNote; file: TFile; markdown: string }> = [];
   for (const file of files) {
     const markdown = await app.vault.cachedRead(file);
@@ -273,7 +276,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
 
     new Setting(containerEl)
       .setName("Root folders")
-      .setDesc("Comma-separated root folders to scan for notes.")
+      .setDesc("Comma-separated root folders to scan for notes. Leave empty to scan the whole vault.")
       .addText((text) =>
         text.setValue(this.plugin.settings.rootFolders.join(", "))
           .onChange(async (value) => {

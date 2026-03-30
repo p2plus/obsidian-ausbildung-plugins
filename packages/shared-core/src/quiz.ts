@@ -1,10 +1,18 @@
 import { LearningNote } from "./types";
 
 function extractCandidates(markdown: string): string[] {
-  return markdown
+  const structured = markdown
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.startsWith("- ") || line.startsWith("## ") || /\*\*.+\*\*/.test(line))
+    .slice(0, 5);
+  if (structured.length > 0) {
+    return structured;
+  }
+  return markdown
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 20 && !line.startsWith("#") && !line.startsWith("---"))
     .slice(0, 5);
 }
 
@@ -34,4 +42,3 @@ export function generateQuizFromMarkdown(note: LearningNote, markdown: string): 
   });
   return lines.join("\n");
 }
-

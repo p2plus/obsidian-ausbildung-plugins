@@ -1,5 +1,5 @@
 import { Modal, Notice, Plugin, Setting } from "obsidian";
-import { buildReviewPriorityAiRequest, calculateNextReview, normalizeReviewPriority } from "@ausbildung/shared-core";
+import { buildReviewPriorityAiRequest, calculateNextReview, normalizeReviewPriority, updateYamlField } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
 
 type Rating = "vergessen" | "schwer" | "mittel" | "leicht";
@@ -116,17 +116,8 @@ export default class SpacedRepetitionEnginePlugin extends Plugin {
     const today = new Date().toISOString().slice(0, 10);
     const result = calculateNextReview(today, rating, 4);
     const content = await this.app.vault.cachedRead(file);
-    let updated = content;
-    if (content.includes("next_review:")) {
-      updated = updated.replace(/^next_review:.*$/m, `next_review: "${result.nextReview}"`);
-    } else {
-      updated = `---\nnext_review: "${result.nextReview}"\n---\n\n${updated}`;
-    }
-    if (updated.includes("last_review:")) {
-      updated = updated.replace(/^last_review:.*$/m, `last_review: "${today}"`);
-    } else {
-      updated = updated.replace(/^---\n/, `---\nlast_review: "${today}"\n`);
-    }
+    let updated = updateYamlField(content, "next_review", result.nextReview);
+    updated = updateYamlField(updated, "last_review", today);
     await this.app.vault.modify(file, updated);
     await updateLearningStatus(this.app, file, rating === "leicht" ? "sicher" : rating === "vergessen" ? "gelesen" : "geuebt");
     new Notice(`Naechste Wiederholung: ${result.nextReview}`);

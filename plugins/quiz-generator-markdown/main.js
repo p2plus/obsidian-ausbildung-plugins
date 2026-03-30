@@ -175,7 +175,11 @@ function parseLearningNote(path, markdown) {
 
 // ../../packages/shared-core/src/quiz.ts
 function extractCandidates(markdown) {
-  return markdown.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.startsWith("- ") || line.startsWith("## ") || /\*\*.+\*\*/.test(line)).slice(0, 5);
+  const structured = markdown.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.startsWith("- ") || line.startsWith("## ") || /\*\*.+\*\*/.test(line)).slice(0, 5);
+  if (structured.length > 0) {
+    return structured;
+  }
+  return markdown.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 20 && !line.startsWith("#") && !line.startsWith("---")).slice(0, 5);
 }
 function generateQuizFromMarkdown(note, markdown) {
   const candidates = extractCandidates(markdown);
@@ -207,7 +211,7 @@ function generateQuizFromMarkdown(note, markdown) {
 // ../../packages/plugin-kit/src/index.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_BASE_SETTINGS = {
-  rootFolders: ["000_Ausbildung_Industriekaufmann_2026", "quizzes"],
+  rootFolders: [],
   dashboardFolder: "_plugin_outputs",
   periodicNotesFolder: "Periodic/Daily",
   useDataview: true,
@@ -393,7 +397,7 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: this.plugin.manifest.name });
-    new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes.").addText(
+    new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes. Leave empty to scan the whole vault.").addText(
       (text) => text.setValue(this.plugin.settings.rootFolders.join(", ")).onChange(async (value) => {
         this.plugin.settings.rootFolders = value.split(",").map((entry) => entry.trim()).filter(Boolean);
         await this.plugin.saveSettings();

@@ -150,7 +150,7 @@ function renderStudyPlanMarkdown(tasks) {
 // ../../packages/plugin-kit/src/index.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_BASE_SETTINGS = {
-  rootFolders: ["000_Ausbildung_Industriekaufmann_2026", "quizzes"],
+  rootFolders: [],
   dashboardFolder: "_plugin_outputs",
   periodicNotesFolder: "Periodic/Daily",
   useDataview: true,
@@ -169,7 +169,8 @@ var DEFAULT_BASE_SETTINGS = {
   aiConnectionTestedAt: ""
 };
 async function scanVault(app, rootFolders) {
-  const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
+  const normalizedRoots = rootFolders.map((entry) => entry.trim()).filter(Boolean);
+  const files = app.vault.getMarkdownFiles().filter((file) => normalizedRoots.length === 0 || normalizedRoots.some((folder) => file.path.startsWith(folder)));
   const results = [];
   for (const file of files) {
     const markdown = await app.vault.cachedRead(file);
