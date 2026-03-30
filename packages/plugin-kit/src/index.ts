@@ -280,8 +280,11 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
       cls: "ausbildung-settings-intro__text",
       text: "These settings control where the plugin scans, where it writes output, and whether AI enrichment is active."
     });
+    const scanSection = containerEl.createDiv({ cls: "ausbildung-settings-section" });
 
-    new Setting(containerEl)
+    scanSection.createEl("h3", { text: "Vault scope" });
+
+    new Setting(scanSection)
       .setName("Root folders")
       .setDesc("Comma-separated root folders to scan for notes. Leave empty to scan the whole vault.")
       .addText((text) =>
@@ -292,7 +295,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
           })
       );
 
-    new Setting(containerEl)
+    new Setting(scanSection)
       .setName("Output folder")
       .setDesc("Where generated markdown dashboards and plans should be written.")
       .addText((text) =>
@@ -303,7 +306,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
           })
       );
 
-    new Setting(containerEl)
+    new Setting(scanSection)
       .setName("Periodic notes folder")
       .setDesc("Folder used for review queues and study journal integration.")
       .addText((text) =>
@@ -314,7 +317,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
           })
       );
 
-    new Setting(containerEl)
+    new Setting(scanSection)
       .setName("Prefer Dataview")
       .setDesc("Use Dataview when available, but keep a safe fallback.")
       .addToggle((toggle) =>
@@ -325,9 +328,19 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
           })
       );
 
-    containerEl.createEl("h3", { text: "AI / BYOK" });
+    const aiSection = containerEl.createDiv({ cls: "ausbildung-settings-section" });
+    aiSection.createEl("h3", { text: "AI / BYOK" });
+    aiSection.createDiv({
+      cls: `ausbildung-settings-status ausbildung-settings-status--${this.plugin.settings.aiConnectionStatus}`,
+      text:
+        this.plugin.settings.aiConnectionStatus === "ok"
+          ? "Connection verified"
+          : this.plugin.settings.aiConnectionStatus === "error"
+            ? "Connection failed"
+            : "Connection not tested"
+    });
 
-    new Setting(containerEl)
+    new Setting(aiSection)
       .setName("Enable AI features")
       .setDesc("Use BYOK-backed AI features where the plugin supports them.")
       .addToggle((toggle) =>
@@ -339,7 +352,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
           })
       );
 
-    new Setting(containerEl)
+    new Setting(aiSection)
       .setName("AI provider")
       .setDesc("Choose the provider for AI-backed features.")
       .addDropdown((dropdown) =>
@@ -355,7 +368,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
           })
       );
 
-    new Setting(containerEl)
+    new Setting(aiSection)
       .setName("Request timeout")
       .setDesc("Timeout in milliseconds for provider requests.")
       .addText((text) =>
@@ -367,7 +380,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
       );
 
     if (this.plugin.settings.aiProvider === "openai") {
-      new Setting(containerEl)
+      new Setting(aiSection)
         .setName("OpenAI API key")
         .setDesc("Stored in Obsidian plugin settings.")
         .addText((text) => {
@@ -380,7 +393,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
               await this.plugin.saveSettings();
             });
         });
-      new Setting(containerEl)
+      new Setting(aiSection)
         .setName("OpenAI model")
         .addText((text) =>
           text.setValue(this.plugin.settings.openAiModel)
@@ -392,7 +405,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
     }
 
     if (this.plugin.settings.aiProvider === "openrouter") {
-      new Setting(containerEl)
+      new Setting(aiSection)
         .setName("OpenRouter API key")
         .setDesc("Stored in Obsidian plugin settings.")
         .addText((text) => {
@@ -405,7 +418,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
               await this.plugin.saveSettings();
             });
         });
-      new Setting(containerEl)
+      new Setting(aiSection)
         .setName("OpenRouter model")
         .addText((text) =>
           text.setValue(this.plugin.settings.openRouterModel)
@@ -417,7 +430,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
     }
 
     if (this.plugin.settings.aiProvider === "custom") {
-      new Setting(containerEl)
+      new Setting(aiSection)
         .setName("Custom endpoint")
         .setDesc("OpenAI-compatible chat completions endpoint.")
         .addText((text) =>
@@ -427,7 +440,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
               await this.plugin.saveSettings();
             })
         );
-      new Setting(containerEl)
+      new Setting(aiSection)
         .setName("Custom API key")
         .setDesc("Stored in Obsidian plugin settings.")
         .addText((text) => {
@@ -440,7 +453,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
               await this.plugin.saveSettings();
             });
         });
-      new Setting(containerEl)
+      new Setting(aiSection)
         .setName("Custom model")
         .addText((text) =>
           text.setValue(this.plugin.settings.customModel)
@@ -451,7 +464,7 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
         );
     }
 
-    new Setting(containerEl)
+    new Setting(aiSection)
       .setName("Test AI connection")
       .setDesc("Checks the currently selected provider, model, and key.")
       .addButton((button) =>
@@ -493,7 +506,8 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
         : status === "error"
           ? `Last test failed. ${this.plugin.settings.aiConnectionMessage}`
           : this.plugin.settings.aiConnectionMessage;
-    containerEl.createEl("p", {
+    aiSection.createEl("p", {
+      cls: "ausbildung-settings-status-text",
       text: this.plugin.settings.aiConnectionTestedAt
         ? `${statusText} (${this.plugin.settings.aiConnectionTestedAt})`
         : statusText

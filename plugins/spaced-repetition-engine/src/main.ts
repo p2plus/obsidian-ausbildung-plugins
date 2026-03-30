@@ -169,6 +169,7 @@ class ReviewQueueModal extends Modal {
     const queueStat = createStatCard(stats, "Due today", "...");
     const aiStat = createStatCard(stats, "Mode", this.plugin.settings.aiEnabled ? "AI + local" : "Local only");
     const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const summary = body.createDiv({ cls: "ausbildung-modal__summary" });
     const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
     const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
@@ -181,10 +182,20 @@ class ReviewQueueModal extends Modal {
       const itemCount = (markdown.match(/^- \[ \]/gm) ?? []).length;
       queueStat.setText(String(itemCount));
       aiStat.setText(this.plugin.settings.aiEnabled ? "AI-ready" : "Fallback");
+      summary.empty();
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Daily limit: ${this.plugin.settings.dailyQueueLimit}` });
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Target: ${fileName}` });
       preview.empty();
-      await MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
+      if (itemCount === 0) {
+        preview.createDiv({
+          cls: "ausbildung-modal__empty",
+          text: "Keine faelligen Reviews gefunden. Sobald Notizen ein next_review in der Vergangenheit oder heute haben, erscheint hier deine Queue."
+        });
+      } else {
+        await MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
+      }
       saveButton.setText(`Save as ${fileName}`);
-      saveButton.disabled = false;
+      saveButton.disabled = itemCount === 0;
       saveButton.addEventListener("click", async () => {
         await this.plugin.generateQueue();
         this.close();

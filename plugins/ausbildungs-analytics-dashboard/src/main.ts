@@ -105,6 +105,7 @@ class AnalyticsPreviewModal extends Modal {
     const noteStat = createStatCard(stats, "Notes", "...");
     const reviewStat = createStatCard(stats, "Due reviews", "...");
     const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const summary = body.createDiv({ cls: "ausbildung-modal__summary" });
     const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
     const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
@@ -116,6 +117,9 @@ class AnalyticsPreviewModal extends Modal {
       const markdown = await this.plugin.buildReport();
       noteStat.setText(matchMetric(markdown, /- Notizen: (\d+)/) ?? "0");
       reviewStat.setText(matchMetric(markdown, /## Faellige Reviews\s+- (\d+)/m) ?? "0");
+      summary.empty();
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Output: ${this.plugin.settings.dashboardFolder}/analytics-report.md` });
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: this.plugin.settings.aiEnabled ? "Narrative summary enabled" : "Local metrics only" });
       preview.empty();
       await MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
       saveButton.disabled = false;

@@ -189,6 +189,7 @@ class QuizPreviewModal extends Modal {
     createStatCard(stats, "Mode", this.plugin.settings.generationMode === "ai-enhanced" ? "AI-enhanced" : "Rule-based");
     createStatCard(stats, "Exam level", this.plugin.settings.examLevel);
     const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const summary = body.createDiv({ cls: "ausbildung-modal__summary" });
     const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
     const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
@@ -199,6 +200,9 @@ class QuizPreviewModal extends Modal {
     try {
       const result = await this.plugin.buildQuizFromCurrent();
       questionStat.setText(String((result.markdown.match(/^## Frage /gm) ?? []).length));
+      summary.empty();
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Output: ${this.plugin.settings.outputFolder}/${result.fileName}` });
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Target level: ${this.plugin.settings.examLevel}` });
       preview.empty();
       await MarkdownRenderer.render(this.app, result.markdown, preview, "", this.plugin);
       saveButton.setText(`Save as ${result.fileName}`);

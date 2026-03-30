@@ -165,6 +165,7 @@ class KeywordPreviewModal extends Modal {
     createStatCard(stats, "Keywords", String(this.plugin.settings.keywords.length));
     const warningStat = createStatCard(stats, "Warnings", "...");
     const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const summary = body.createDiv({ cls: "ausbildung-modal__summary" });
     const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
     const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
@@ -174,7 +175,11 @@ class KeywordPreviewModal extends Modal {
     closeButton.addEventListener("click", () => this.close());
     try {
       const markdown = await this.plugin.buildReport();
-      warningStat.setText(String((markdown.match(/unterrepraesentiert/g) ?? []).length));
+      const warnings = (markdown.match(/unterrepraesentiert/g) ?? []).length;
+      warningStat.setText(String(warnings));
+      summary.empty();
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Alias groups: ${this.plugin.settings.aliasGroups.length}` });
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: warnings > 0 ? `${warnings} warnings in current run` : "No warnings in current run" });
       preview.empty();
       await MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
       saveButton.disabled = false;

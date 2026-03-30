@@ -422,60 +422,67 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
       cls: "ausbildung-settings-intro__text",
       text: "These settings control where the plugin scans, where it writes output, and whether AI enrichment is active."
     });
-    new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes. Leave empty to scan the whole vault.").addText(
+    const scanSection = containerEl.createDiv({ cls: "ausbildung-settings-section" });
+    scanSection.createEl("h3", { text: "Vault scope" });
+    new import_obsidian.Setting(scanSection).setName("Root folders").setDesc("Comma-separated root folders to scan for notes. Leave empty to scan the whole vault.").addText(
       (text) => text.setValue(this.plugin.settings.rootFolders.join(", ")).onChange(async (value) => {
         this.plugin.settings.rootFolders = value.split(",").map((entry) => entry.trim()).filter(Boolean);
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Output folder").setDesc("Where generated markdown dashboards and plans should be written.").addText(
+    new import_obsidian.Setting(scanSection).setName("Output folder").setDesc("Where generated markdown dashboards and plans should be written.").addText(
       (text) => text.setValue(this.plugin.settings.dashboardFolder).onChange(async (value) => {
         this.plugin.settings.dashboardFolder = value.trim() || "_plugin_outputs";
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Periodic notes folder").setDesc("Folder used for review queues and study journal integration.").addText(
+    new import_obsidian.Setting(scanSection).setName("Periodic notes folder").setDesc("Folder used for review queues and study journal integration.").addText(
       (text) => text.setValue(this.plugin.settings.periodicNotesFolder).onChange(async (value) => {
         this.plugin.settings.periodicNotesFolder = value.trim() || "Periodic/Daily";
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Prefer Dataview").setDesc("Use Dataview when available, but keep a safe fallback.").addToggle(
+    new import_obsidian.Setting(scanSection).setName("Prefer Dataview").setDesc("Use Dataview when available, but keep a safe fallback.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.useDataview).onChange(async (value) => {
         this.plugin.settings.useDataview = value;
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: "AI / BYOK" });
-    new import_obsidian.Setting(containerEl).setName("Enable AI features").setDesc("Use BYOK-backed AI features where the plugin supports them.").addToggle(
+    const aiSection = containerEl.createDiv({ cls: "ausbildung-settings-section" });
+    aiSection.createEl("h3", { text: "AI / BYOK" });
+    aiSection.createDiv({
+      cls: `ausbildung-settings-status ausbildung-settings-status--${this.plugin.settings.aiConnectionStatus}`,
+      text: this.plugin.settings.aiConnectionStatus === "ok" ? "Connection verified" : this.plugin.settings.aiConnectionStatus === "error" ? "Connection failed" : "Connection not tested"
+    });
+    new import_obsidian.Setting(aiSection).setName("Enable AI features").setDesc("Use BYOK-backed AI features where the plugin supports them.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.aiEnabled).onChange(async (value) => {
         this.plugin.settings.aiEnabled = value;
         await this.plugin.saveSettings();
         this.display();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("AI provider").setDesc("Choose the provider for AI-backed features.").addDropdown(
+    new import_obsidian.Setting(aiSection).setName("AI provider").setDesc("Choose the provider for AI-backed features.").addDropdown(
       (dropdown) => dropdown.addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").addOption("custom", "Custom OpenAI-compatible").setValue(this.plugin.settings.aiProvider).onChange(async (value) => {
         this.plugin.settings.aiProvider = value;
         await this.plugin.saveSettings();
         this.display();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Request timeout").setDesc("Timeout in milliseconds for provider requests.").addText(
+    new import_obsidian.Setting(aiSection).setName("Request timeout").setDesc("Timeout in milliseconds for provider requests.").addText(
       (text) => text.setValue(String(this.plugin.settings.requestTimeoutMs)).onChange(async (value) => {
         this.plugin.settings.requestTimeoutMs = Number(value) || 45e3;
         await this.plugin.saveSettings();
       })
     );
     if (this.plugin.settings.aiProvider === "openai") {
-      new import_obsidian.Setting(containerEl).setName("OpenAI API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
+      new import_obsidian.Setting(aiSection).setName("OpenAI API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
         text.inputEl.type = "password";
         return text.setPlaceholder("sk-...").setValue(this.plugin.settings.openAiApiKey).onChange(async (value) => {
           this.plugin.settings.openAiApiKey = value;
           await this.plugin.saveSettings();
         });
       });
-      new import_obsidian.Setting(containerEl).setName("OpenAI model").addText(
+      new import_obsidian.Setting(aiSection).setName("OpenAI model").addText(
         (text) => text.setValue(this.plugin.settings.openAiModel).onChange(async (value) => {
           this.plugin.settings.openAiModel = value.trim() || "gpt-4.1-mini";
           await this.plugin.saveSettings();
@@ -483,14 +490,14 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
       );
     }
     if (this.plugin.settings.aiProvider === "openrouter") {
-      new import_obsidian.Setting(containerEl).setName("OpenRouter API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
+      new import_obsidian.Setting(aiSection).setName("OpenRouter API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
         text.inputEl.type = "password";
         return text.setPlaceholder("sk-or-...").setValue(this.plugin.settings.openRouterApiKey).onChange(async (value) => {
           this.plugin.settings.openRouterApiKey = value;
           await this.plugin.saveSettings();
         });
       });
-      new import_obsidian.Setting(containerEl).setName("OpenRouter model").addText(
+      new import_obsidian.Setting(aiSection).setName("OpenRouter model").addText(
         (text) => text.setValue(this.plugin.settings.openRouterModel).onChange(async (value) => {
           this.plugin.settings.openRouterModel = value.trim() || "openai/gpt-4.1-mini";
           await this.plugin.saveSettings();
@@ -498,27 +505,27 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
       );
     }
     if (this.plugin.settings.aiProvider === "custom") {
-      new import_obsidian.Setting(containerEl).setName("Custom endpoint").setDesc("OpenAI-compatible chat completions endpoint.").addText(
+      new import_obsidian.Setting(aiSection).setName("Custom endpoint").setDesc("OpenAI-compatible chat completions endpoint.").addText(
         (text) => text.setValue(this.plugin.settings.customEndpoint).onChange(async (value) => {
           this.plugin.settings.customEndpoint = value.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Custom API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
+      new import_obsidian.Setting(aiSection).setName("Custom API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
         text.inputEl.type = "password";
         return text.setPlaceholder("API key").setValue(this.plugin.settings.customApiKey).onChange(async (value) => {
           this.plugin.settings.customApiKey = value;
           await this.plugin.saveSettings();
         });
       });
-      new import_obsidian.Setting(containerEl).setName("Custom model").addText(
+      new import_obsidian.Setting(aiSection).setName("Custom model").addText(
         (text) => text.setValue(this.plugin.settings.customModel).onChange(async (value) => {
           this.plugin.settings.customModel = value.trim() || "gpt-4.1-mini";
           await this.plugin.saveSettings();
         })
       );
     }
-    new import_obsidian.Setting(containerEl).setName("Test AI connection").setDesc("Checks the currently selected provider, model, and key.").addButton(
+    new import_obsidian.Setting(aiSection).setName("Test AI connection").setDesc("Checks the currently selected provider, model, and key.").addButton(
       (button) => button.setButtonText("Run test").onClick(async () => {
         const config = getAiProviderConfig(this.plugin.settings);
         if (!config) {
@@ -550,7 +557,8 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
     );
     const status = this.plugin.settings.aiConnectionStatus;
     const statusText = status === "ok" ? `Last test passed. ${this.plugin.settings.aiConnectionMessage}` : status === "error" ? `Last test failed. ${this.plugin.settings.aiConnectionMessage}` : this.plugin.settings.aiConnectionMessage;
-    containerEl.createEl("p", {
+    aiSection.createEl("p", {
+      cls: "ausbildung-settings-status-text",
       text: this.plugin.settings.aiConnectionTestedAt ? `${statusText} (${this.plugin.settings.aiConnectionTestedAt})` : statusText
     });
   }
@@ -695,6 +703,7 @@ var ReviewQueueModal = class extends import_obsidian2.Modal {
     const queueStat = createStatCard(stats, "Due today", "...");
     const aiStat = createStatCard(stats, "Mode", this.plugin.settings.aiEnabled ? "AI + local" : "Local only");
     const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const summary = body.createDiv({ cls: "ausbildung-modal__summary" });
     const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
     const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
@@ -707,10 +716,20 @@ var ReviewQueueModal = class extends import_obsidian2.Modal {
       const itemCount = (markdown.match(/^- \[ \]/gm) ?? []).length;
       queueStat.setText(String(itemCount));
       aiStat.setText(this.plugin.settings.aiEnabled ? "AI-ready" : "Fallback");
+      summary.empty();
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Daily limit: ${this.plugin.settings.dailyQueueLimit}` });
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Target: ${fileName}` });
       preview.empty();
-      await import_obsidian2.MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
+      if (itemCount === 0) {
+        preview.createDiv({
+          cls: "ausbildung-modal__empty",
+          text: "Keine faelligen Reviews gefunden. Sobald Notizen ein next_review in der Vergangenheit oder heute haben, erscheint hier deine Queue."
+        });
+      } else {
+        await import_obsidian2.MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
+      }
       saveButton.setText(`Save as ${fileName}`);
-      saveButton.disabled = false;
+      saveButton.disabled = itemCount === 0;
       saveButton.addEventListener("click", async () => {
         await this.plugin.generateQueue();
         this.close();
