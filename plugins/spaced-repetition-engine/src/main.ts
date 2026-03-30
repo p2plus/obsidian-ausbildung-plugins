@@ -1,4 +1,4 @@
-import { Modal, Notice, Plugin, Setting } from "obsidian";
+import { MarkdownRenderer, Modal, Notice, Plugin, Setting } from "obsidian";
 import { buildReviewPriorityAiRequest, calculateNextReview, normalizeReviewPriority, updateYamlField } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
 
@@ -157,20 +157,50 @@ class ReviewQueueModal extends Modal {
   async onOpen(): Promise<void> {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Review Queue Preview" });
-    const preview = contentEl.createEl("pre");
-    preview.addClass("sr-preview");
+    const shell = contentEl.createDiv({ cls: "ausbildung-modal sr-modal" });
+    const hero = shell.createDiv({ cls: "ausbildung-modal__hero" });
+    hero.createDiv({ cls: "ausbildung-modal__eyebrow", text: "Spaced repetition" });
+    hero.createEl("h2", { cls: "ausbildung-modal__title", text: "Review Queue Preview" });
+    hero.createEl("p", {
+      cls: "ausbildung-modal__subtitle",
+      text: "Faellige Wiederholungen, priorisiert fuer den heutigen Durchgang."
+    });
+    const stats = shell.createDiv({ cls: "ausbildung-modal__stats" });
+    const queueStat = createStatCard(stats, "Due today", "...");
+    const aiStat = createStatCard(stats, "Mode", this.plugin.settings.aiEnabled ? "AI + local" : "Local only");
+    const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
+    const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
+    const saveButton = actions.createEl("button", { cls: "mod-cta", text: "Save queue" });
+    saveButton.disabled = true;
+    const closeButton = actions.createEl("button", { text: "Close" });
+    closeButton.addEventListener("click", () => this.close());
     try {
       const { markdown, fileName } = await this.plugin.buildQueueMarkdown();
-      preview.setText(markdown);
-      const button = contentEl.createEl("button", { text: `Queue speichern als ${fileName}` });
-      button.addEventListener("click", async () => {
+      const itemCount = (markdown.match(/^- \[ \]/gm) ?? []).length;
+      queueStat.setText(String(itemCount));
+      aiStat.setText(this.plugin.settings.aiEnabled ? "AI-ready" : "Fallback");
+      preview.empty();
+      await MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
+      saveButton.setText(`Save as ${fileName}`);
+      saveButton.disabled = false;
+      saveButton.addEventListener("click", async () => {
         await this.plugin.generateQueue();
         this.close();
       });
     } catch (error) {
-      preview.setText(`Queue konnte nicht erzeugt werden: ${String(error)}`);
+      preview.empty();
+      preview.createDiv({
+        cls: "ausbildung-modal__error",
+        text: `Queue konnte nicht erzeugt werden: ${String(error)}`
+      });
     }
   }
+}
+
+function createStatCard(container: HTMLElement, label: string, value: string): HTMLElement {
+  const card = container.createDiv({ cls: "ausbildung-modal__stat" });
+  card.createDiv({ cls: "ausbildung-modal__stat-label", text: label });
+  return card.createDiv({ cls: "ausbildung-modal__stat-value", text: value });
 }

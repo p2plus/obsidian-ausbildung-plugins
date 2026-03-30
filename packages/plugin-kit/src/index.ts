@@ -272,7 +272,14 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
+    containerEl.addClass("ausbildung-settings-tab");
     containerEl.createEl("h2", { text: this.plugin.manifest.name });
+    const intro = containerEl.createDiv({ cls: "ausbildung-settings-intro" });
+    intro.createDiv({ cls: "ausbildung-settings-intro__label", text: "Plugin Setup" });
+    intro.createEl("p", {
+      cls: "ausbildung-settings-intro__text",
+      text: "These settings control where the plugin scans, where it writes output, and whether AI enrichment is active."
+    });
 
     new Setting(containerEl)
       .setName("Root folders")

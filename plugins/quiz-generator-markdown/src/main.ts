@@ -1,4 +1,4 @@
-import { Modal, Notice, Plugin, Setting } from "obsidian";
+import { MarkdownRenderer, Modal, Notice, Plugin, Setting } from "obsidian";
 import { buildQuizAiRequest, generateQuizFromMarkdown, normalizeQuizDraftQuestions, parseLearningNote, QuizDraftQuestion } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, writePluginOutput } from "@ausbildung/plugin-kit";
 
@@ -176,20 +176,46 @@ class QuizPreviewModal extends Modal {
   async onOpen(): Promise<void> {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Quiz Preview" });
-    const preview = contentEl.createEl("pre");
-    preview.addClass("quiz-preview");
+    const shell = contentEl.createDiv({ cls: "ausbildung-modal quiz-modal" });
+    const hero = shell.createDiv({ cls: "ausbildung-modal__hero" });
+    hero.createDiv({ cls: "ausbildung-modal__eyebrow", text: "Quiz generation" });
+    hero.createEl("h2", { cls: "ausbildung-modal__title", text: "Quiz Preview" });
+    hero.createEl("p", {
+      cls: "ausbildung-modal__subtitle",
+      text: "Voransicht des Quiz-Sets fuer die aktuell geoeffnete Notiz."
+    });
+    const stats = shell.createDiv({ cls: "ausbildung-modal__stats" });
+    const questionStat = createStatCard(stats, "Questions", "...");
+    createStatCard(stats, "Mode", this.plugin.settings.generationMode === "ai-enhanced" ? "AI-enhanced" : "Rule-based");
+    createStatCard(stats, "Exam level", this.plugin.settings.examLevel);
+    const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
+    const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
+    const saveButton = actions.createEl("button", { cls: "mod-cta", text: "Save quiz" });
+    saveButton.disabled = true;
+    const closeButton = actions.createEl("button", { text: "Close" });
+    closeButton.addEventListener("click", () => this.close());
     try {
       const result = await this.plugin.buildQuizFromCurrent();
-      preview.setText(result.markdown);
-      const button = contentEl.createEl("button", { text: `Quiz speichern als ${result.fileName}` });
-      button.addEventListener("click", async () => {
+      questionStat.setText(String((result.markdown.match(/^## Frage /gm) ?? []).length));
+      preview.empty();
+      await MarkdownRenderer.render(this.app, result.markdown, preview, "", this.plugin);
+      saveButton.setText(`Save as ${result.fileName}`);
+      saveButton.disabled = false;
+      saveButton.addEventListener("click", async () => {
         await this.plugin.generateFromCurrent();
         this.close();
       });
     } catch (error) {
-      preview.setText(String(error));
+      preview.empty();
+      preview.createDiv({ cls: "ausbildung-modal__error", text: String(error) });
     }
   }
+}
+
+function createStatCard(container: HTMLElement, label: string, value: string): HTMLElement {
+  const card = container.createDiv({ cls: "ausbildung-modal__stat" });
+  card.createDiv({ cls: "ausbildung-modal__stat-label", text: label });
+  return card.createDiv({ cls: "ausbildung-modal__stat-value", text: value });
 }

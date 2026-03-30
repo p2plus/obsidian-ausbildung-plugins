@@ -1,4 +1,4 @@
-import { Modal, Notice, Plugin } from "obsidian";
+import { MarkdownRenderer, Modal, Notice, Plugin } from "obsidian";
 import { buildAnalyticsAiRequest, buildAnalyticsReport, calculateDashboardMetrics, normalizeAnalyticsInsight } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
 
@@ -93,20 +93,52 @@ class AnalyticsPreviewModal extends Modal {
   async onOpen(): Promise<void> {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Analytics Preview" });
-    const preview = contentEl.createEl("pre");
-    preview.addClass("analytics-preview");
+    const shell = contentEl.createDiv({ cls: "ausbildung-modal analytics-modal" });
+    const hero = shell.createDiv({ cls: "ausbildung-modal__hero" });
+    hero.createDiv({ cls: "ausbildung-modal__eyebrow", text: "Analytics" });
+    hero.createEl("h2", { cls: "ausbildung-modal__title", text: "Analytics Preview" });
+    hero.createEl("p", {
+      cls: "ausbildung-modal__subtitle",
+      text: "Aggregierter Bericht ueber Fortschritt, Review-Druck und schwache Module."
+    });
+    const stats = shell.createDiv({ cls: "ausbildung-modal__stats" });
+    const noteStat = createStatCard(stats, "Notes", "...");
+    const reviewStat = createStatCard(stats, "Due reviews", "...");
+    const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
+    const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
+    const saveButton = actions.createEl("button", { cls: "mod-cta", text: "Save report" });
+    saveButton.disabled = true;
+    const closeButton = actions.createEl("button", { text: "Close" });
+    closeButton.addEventListener("click", () => this.close());
     try {
       const markdown = await this.plugin.buildReport();
-      preview.setText(markdown);
-      const button = contentEl.createEl("button", { text: "Analytics speichern" });
-      button.addEventListener("click", async () => {
+      noteStat.setText(matchMetric(markdown, /- Notizen: (\d+)/) ?? "0");
+      reviewStat.setText(matchMetric(markdown, /## Faellige Reviews\s+- (\d+)/m) ?? "0");
+      preview.empty();
+      await MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
+      saveButton.disabled = false;
+      saveButton.addEventListener("click", async () => {
         await this.plugin.generateReport();
         this.close();
       });
     } catch (error) {
-      preview.setText(`Report konnte nicht erzeugt werden: ${String(error)}`);
+      preview.empty();
+      preview.createDiv({
+        cls: "ausbildung-modal__error",
+        text: `Report konnte nicht erzeugt werden: ${String(error)}`
+      });
     }
   }
+}
+
+function createStatCard(container: HTMLElement, label: string, value: string): HTMLElement {
+  const card = container.createDiv({ cls: "ausbildung-modal__stat" });
+  card.createDiv({ cls: "ausbildung-modal__stat-label", text: label });
+  return card.createDiv({ cls: "ausbildung-modal__stat-value", text: value });
+}
+
+function matchMetric(markdown: string, pattern: RegExp): string | null {
+  return markdown.match(pattern)?.[1] ?? null;
 }

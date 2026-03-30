@@ -1,9 +1,111 @@
-.keyword-preview {
-  white-space: pre-wrap;
-  max-height: 60vh;
-  overflow: auto;
-  padding: 1rem;
+.keyword-modal {
+  --ausbildung-accent: #7d5a2f;
+}
+
+.ausbildung-modal {
+  display: grid;
+  gap: 1rem;
+}
+
+.ausbildung-modal__hero {
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--ausbildung-accent) 26%, var(--background-modifier-border));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ausbildung-accent) 18%, transparent), transparent 60%),
+    var(--background-secondary);
+}
+
+.ausbildung-modal__eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+  margin-bottom: 0.35rem;
+}
+
+.ausbildung-modal__title {
+  margin: 0;
+}
+
+.ausbildung-modal__subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.ausbildung-modal__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.ausbildung-modal__stat {
+  padding: 0.8rem 0.9rem;
+  border-radius: 14px;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
+}
+
+.ausbildung-modal__stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+.ausbildung-modal__stat-value {
+  margin-top: 0.25rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.ausbildung-modal__body {
+  border-radius: 16px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  overflow: hidden;
+}
+
+.ausbildung-modal__rendered {
+  max-height: 58vh;
+  overflow: auto;
+  padding: 1.15rem;
+}
+
+.ausbildung-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.ausbildung-modal__error,
+.ausbildung-settings-intro {
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.ausbildung-modal__error {
+  color: var(--text-error);
+}
+
+.ausbildung-settings-intro {
+  margin-bottom: 1rem;
+}
+
+.ausbildung-settings-intro__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-accent);
+  font-weight: 700;
+}
+
+.ausbildung-settings-intro__text {
+  margin: 0.4rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.45;
 }

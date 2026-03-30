@@ -414,7 +414,14 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
+    containerEl.addClass("ausbildung-settings-tab");
     containerEl.createEl("h2", { text: this.plugin.manifest.name });
+    const intro = containerEl.createDiv({ cls: "ausbildung-settings-intro" });
+    intro.createDiv({ cls: "ausbildung-settings-intro__label", text: "Plugin Setup" });
+    intro.createEl("p", {
+      cls: "ausbildung-settings-intro__text",
+      text: "These settings control where the plugin scans, where it writes output, and whether AI enrichment is active."
+    });
     new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes. Leave empty to scan the whole vault.").addText(
       (text) => text.setValue(this.plugin.settings.rootFolders.join(", ")).onChange(async (value) => {
         this.plugin.settings.rootFolders = value.split(",").map((entry) => entry.trim()).filter(Boolean);
@@ -676,20 +683,49 @@ var ReviewQueueModal = class extends import_obsidian2.Modal {
   async onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Review Queue Preview" });
-    const preview = contentEl.createEl("pre");
-    preview.addClass("sr-preview");
+    const shell = contentEl.createDiv({ cls: "ausbildung-modal sr-modal" });
+    const hero = shell.createDiv({ cls: "ausbildung-modal__hero" });
+    hero.createDiv({ cls: "ausbildung-modal__eyebrow", text: "Spaced repetition" });
+    hero.createEl("h2", { cls: "ausbildung-modal__title", text: "Review Queue Preview" });
+    hero.createEl("p", {
+      cls: "ausbildung-modal__subtitle",
+      text: "Faellige Wiederholungen, priorisiert fuer den heutigen Durchgang."
+    });
+    const stats = shell.createDiv({ cls: "ausbildung-modal__stats" });
+    const queueStat = createStatCard(stats, "Due today", "...");
+    const aiStat = createStatCard(stats, "Mode", this.plugin.settings.aiEnabled ? "AI + local" : "Local only");
+    const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
+    const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
+    const saveButton = actions.createEl("button", { cls: "mod-cta", text: "Save queue" });
+    saveButton.disabled = true;
+    const closeButton = actions.createEl("button", { text: "Close" });
+    closeButton.addEventListener("click", () => this.close());
     try {
       const { markdown, fileName } = await this.plugin.buildQueueMarkdown();
-      preview.setText(markdown);
-      const button = contentEl.createEl("button", { text: `Queue speichern als ${fileName}` });
-      button.addEventListener("click", async () => {
+      const itemCount = (markdown.match(/^- \[ \]/gm) ?? []).length;
+      queueStat.setText(String(itemCount));
+      aiStat.setText(this.plugin.settings.aiEnabled ? "AI-ready" : "Fallback");
+      preview.empty();
+      await import_obsidian2.MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
+      saveButton.setText(`Save as ${fileName}`);
+      saveButton.disabled = false;
+      saveButton.addEventListener("click", async () => {
         await this.plugin.generateQueue();
         this.close();
       });
     } catch (error) {
-      preview.setText(`Queue konnte nicht erzeugt werden: ${String(error)}`);
+      preview.empty();
+      preview.createDiv({
+        cls: "ausbildung-modal__error",
+        text: `Queue konnte nicht erzeugt werden: ${String(error)}`
+      });
     }
   }
 };
+function createStatCard(container, label, value) {
+  const card = container.createDiv({ cls: "ausbildung-modal__stat" });
+  card.createDiv({ cls: "ausbildung-modal__stat-label", text: label });
+  return card.createDiv({ cls: "ausbildung-modal__stat-value", text: value });
+}

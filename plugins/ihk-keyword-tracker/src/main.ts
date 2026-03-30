@@ -1,4 +1,4 @@
-import { Modal, Plugin, Setting } from "obsidian";
+import { MarkdownRenderer, Modal, Plugin, Setting } from "obsidian";
 import { buildKeywordGapAiRequest, computeKeywordCoverage, normalizeKeywordGaps } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
 
@@ -153,20 +153,47 @@ class KeywordPreviewModal extends Modal {
   async onOpen(): Promise<void> {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Keyword Coverage Preview" });
-    const preview = contentEl.createEl("pre");
-    preview.addClass("keyword-preview");
+    const shell = contentEl.createDiv({ cls: "ausbildung-modal keyword-modal" });
+    const hero = shell.createDiv({ cls: "ausbildung-modal__hero" });
+    hero.createDiv({ cls: "ausbildung-modal__eyebrow", text: "Keyword coverage" });
+    hero.createEl("h2", { cls: "ausbildung-modal__title", text: "Keyword Coverage Preview" });
+    hero.createEl("p", {
+      cls: "ausbildung-modal__subtitle",
+      text: "Deterministische Treffer mit optionaler AI-Themenanalyse fuer Luecken."
+    });
+    const stats = shell.createDiv({ cls: "ausbildung-modal__stats" });
+    createStatCard(stats, "Keywords", String(this.plugin.settings.keywords.length));
+    const warningStat = createStatCard(stats, "Warnings", "...");
+    const body = shell.createDiv({ cls: "ausbildung-modal__body" });
+    const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
     preview.setText("Loading...");
+    const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
+    const saveButton = actions.createEl("button", { cls: "mod-cta", text: "Save report" });
+    saveButton.disabled = true;
+    const closeButton = actions.createEl("button", { text: "Close" });
+    closeButton.addEventListener("click", () => this.close());
     try {
       const markdown = await this.plugin.buildReport();
-      preview.setText(markdown);
-      const button = contentEl.createEl("button", { text: "Bericht speichern" });
-      button.addEventListener("click", async () => {
+      warningStat.setText(String((markdown.match(/unterrepraesentiert/g) ?? []).length));
+      preview.empty();
+      await MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
+      saveButton.disabled = false;
+      saveButton.addEventListener("click", async () => {
         await this.plugin.generateReport();
         this.close();
       });
     } catch (error) {
-      preview.setText(`Bericht konnte nicht erzeugt werden: ${String(error)}`);
+      preview.empty();
+      preview.createDiv({
+        cls: "ausbildung-modal__error",
+        text: `Bericht konnte nicht erzeugt werden: ${String(error)}`
+      });
     }
   }
+}
+
+function createStatCard(container: HTMLElement, label: string, value: string): HTMLElement {
+  const card = container.createDiv({ cls: "ausbildung-modal__stat" });
+  card.createDiv({ cls: "ausbildung-modal__stat-label", text: label });
+  return card.createDiv({ cls: "ausbildung-modal__stat-value", text: value });
 }

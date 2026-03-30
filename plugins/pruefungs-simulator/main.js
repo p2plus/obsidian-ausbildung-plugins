@@ -322,7 +322,14 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
+    containerEl.addClass("ausbildung-settings-tab");
     containerEl.createEl("h2", { text: this.plugin.manifest.name });
+    const intro = containerEl.createDiv({ cls: "ausbildung-settings-intro" });
+    intro.createDiv({ cls: "ausbildung-settings-intro__label", text: "Plugin Setup" });
+    intro.createEl("p", {
+      cls: "ausbildung-settings-intro__text",
+      text: "These settings control where the plugin scans, where it writes output, and whether AI enrichment is active."
+    });
     new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes. Leave empty to scan the whole vault.").addText(
       (text) => text.setValue(this.plugin.settings.rootFolders.join(", ")).onChange(async (value) => {
         this.plugin.settings.rootFolders = value.split(",").map((entry) => entry.trim()).filter(Boolean);
