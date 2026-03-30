@@ -1,12 +1,12 @@
 # Obsidian Ausbildung Plugins
 
-This repository exists for one very practical reason: learning in Obsidian should feel structured, measurable, and less improvised, especially when you are working toward exams.
+Obsidian plugins for structured learning workflows, exam preparation, and progress tracking.
 
-The plugins in here are built for study workflows, not for showing off a framework. They focus on things that matter in day-to-day use: knowing what you already covered, where your weak spots are, what to review next, and how to turn plain markdown notes into something you can actually train with.
+The repository bundles several standalone plugins that share a small common core and the same front matter conventions.
 
 ## What is in this repo
 
-This is a monorepo with several standalone Obsidian plugins. Each plugin can be built and released on its own, but they share a common data model and a small shared core so the behavior stays consistent across the stack.
+This is a monorepo with several standalone Obsidian plugins. Each plugin can be built and released on its own, but they share a common data model and a small shared core.
 
 The repository includes:
 
@@ -21,11 +21,11 @@ What it does not include:
 - personal learning notes
 - scraped training data
 
-The example vault is intentionally artificial. It exists to test behavior safely, not to ship somebody's real study material.
+The example vault is intentionally small and artificial. It exists for reproducible tests and screenshots.
 
 ## Obsidian stack
 
-These plugins are meant to sit comfortably inside a real Obsidian setup instead of pretending to replace it.
+These plugins are designed to work alongside an existing Obsidian setup.
 
 - `Dataview` is treated as the preferred live layer, but never as a hard runtime requirement.
 - `Periodic Notes` is supported as a target for review queues and day-level study planning.
@@ -33,7 +33,7 @@ These plugins are meant to sit comfortably inside a real Obsidian setup instead 
 - `Kanban`, `Calendar`, `Templater`, `Buttons`, `QuickAdd`, `Database Folder`, and `Obsidian Git` all remain useful around the edges because the outputs are ordinary markdown files and normal front matter.
 - `Excalidraw` stays complementary. The plugins do not try to own diagramming or visual thinking.
 
-In short: the repo assumes a serious Obsidian stack, but it does not collapse if one plugin is missing.
+Optional integrations stay optional. The plugins start and run without hard dependencies on other community plugins.
 
 ## Current plugins
 
@@ -50,11 +50,9 @@ In short: the repo assumes a serious Obsidian stack, but it does not collapse if
 - `ausbildungs-analytics-dashboard`
 - `ihk-keyword-tracker`
 
-Experimental here does not mean throwaway. It means the plugin is useful, but not yet at the same release confidence as Tier 1.
+Experimental means the plugin is usable, but not yet held to the same release confidence as Tier 1.
 
 ## Quality bar
-
-Nothing should go public just because it builds once.
 
 Each plugin is expected to have:
 
@@ -78,4 +76,4 @@ Build one plugin on its own:
 npm run build --workspace lernfortschritt-dashboard
 ```
 
-If you want to work on a plugin seriously, use the test vault and verify the markdown output in Obsidian instead of trusting the terminal alone.
+For manual QA, use the test vault and verify the resulting markdown inside Obsidian.

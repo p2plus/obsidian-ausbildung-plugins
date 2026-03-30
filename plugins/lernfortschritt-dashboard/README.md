@@ -1,8 +1,8 @@
 # Lernfortschritt Dashboard
 
-This plugin is for the moment where a vault starts to feel large and slightly vague. You have notes, exercises, maybe some quiz files, but no quick answer to the obvious question: "What have I actually worked through already?"
+`lernfortschritt-dashboard` scans learning notes, reads existing front matter, and writes a compact progress snapshot for the vault.
 
-`lernfortschritt-dashboard` scans your learning notes, reads the front matter you already maintain, and turns that into a clear progress snapshot. It is deliberately conservative: plain markdown in, plain markdown out, and no fragile dependency on `Dataview`, even though it works well alongside it.
+The plugin is intentionally file-based: plain markdown in, plain markdown out, and no hard dependency on `Dataview`.
 
 ## What it does well
 
@@ -11,7 +11,7 @@ This plugin is for the moment where a vault starts to feel large and slightly va
 - shows due reviews without forcing a separate review system
 - lets you update the current note's `lernstatus` quickly from inside Obsidian
 
-## Where it fits in a stack
+## Integration
 
 - strong match with `Dataview`
 - clean front matter for `Metadata Menu`

@@ -1,8 +1,8 @@
 # Lernplan Generator
 
-Planning is easy when the exam is far away and the vault still feels manageable. It gets harder once weak topics pile up, weekends disappear, and "I should study more" stops being useful advice. This plugin is there for that phase.
+`lernplan-generator` builds a markdown study plan from the exam date, available time, blocked days, and the current state of the vault.
 
-`lernplan-generator` works backwards from the exam date and gives you an actual markdown plan based on available time, blocked days, and what the vault itself says is important or overdue. It is not trying to be a life coach. It is trying to be honest and useful.
+The plan is file-based and meant to stay readable without the plugin.
 
 ## What it takes into account
 
@@ -12,7 +12,7 @@ Planning is easy when the exam is far away and the vault still feels manageable.
 - due reviews
 - weak or highly relevant modules
 
-## Obsidian fit
+## Integration
 
 - generated plans can live in a normal folder
 - daily outputs can go straight into `Periodic Notes`
