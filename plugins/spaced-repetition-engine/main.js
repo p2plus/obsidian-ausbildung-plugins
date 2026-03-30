@@ -220,6 +220,16 @@ var DEFAULT_BASE_SETTINGS = {
   openAiModel: "gpt-4.1-mini",
   openRouterApiKey: "",
   openRouterModel: "openai/gpt-4.1-mini",
+  anthropicApiKey: "",
+  anthropicModel: "claude-sonnet-4-6",
+  googleApiKey: "",
+  googleModel: "gemini-2.5-flash",
+  zaiApiKey: "",
+  zaiModel: "glm-4.5-air",
+  minimaxApiKey: "",
+  minimaxModel: "MiniMax-M1",
+  moonshotApiKey: "",
+  moonshotModel: "kimi-k2.5",
   customApiKey: "",
   customModel: "gpt-4.1-mini",
   customEndpoint: "https://api.openai.com/v1/chat/completions",
@@ -302,6 +312,46 @@ function getAiProviderConfig(settings) {
       timeoutMs: settings.requestTimeoutMs
     };
   }
+  if (settings.aiProvider === "anthropic" && settings.anthropicApiKey.trim()) {
+    return {
+      provider: "anthropic",
+      apiKey: settings.anthropicApiKey.trim(),
+      model: settings.anthropicModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "google" && settings.googleApiKey.trim()) {
+    return {
+      provider: "google",
+      apiKey: settings.googleApiKey.trim(),
+      model: settings.googleModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "zai" && settings.zaiApiKey.trim()) {
+    return {
+      provider: "zai",
+      apiKey: settings.zaiApiKey.trim(),
+      model: settings.zaiModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "minimax" && settings.minimaxApiKey.trim()) {
+    return {
+      provider: "minimax",
+      apiKey: settings.minimaxApiKey.trim(),
+      model: settings.minimaxModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "moonshot" && settings.moonshotApiKey.trim()) {
+    return {
+      provider: "moonshot",
+      apiKey: settings.moonshotApiKey.trim(),
+      model: settings.moonshotModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
   if (settings.aiProvider === "custom" && settings.customApiKey.trim() && settings.customEndpoint.trim()) {
     return {
       provider: "custom",
@@ -319,6 +369,21 @@ function getProviderEndpoint(config) {
   }
   if (config.provider === "openrouter") {
     return "https://openrouter.ai/api/v1/chat/completions";
+  }
+  if (config.provider === "anthropic") {
+    return "https://api.anthropic.com/v1/chat/completions";
+  }
+  if (config.provider === "google") {
+    return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+  }
+  if (config.provider === "zai") {
+    return "https://api.z.ai/api/paas/v4/chat/completions";
+  }
+  if (config.provider === "minimax") {
+    return "https://api.minimax.io/v1/chat/completions";
+  }
+  if (config.provider === "moonshot") {
+    return "https://api.moonshot.ai/v1/chat/completions";
   }
   return config.endpoint ?? "https://api.openai.com/v1/chat/completions";
 }
@@ -390,6 +455,11 @@ function providerErrorMessage(provider, status) {
 function providerLabel(provider) {
   if (provider === "openai") return "OpenAI";
   if (provider === "openrouter") return "OpenRouter";
+  if (provider === "anthropic") return "Anthropic";
+  if (provider === "google") return "Google";
+  if (provider === "zai") return "Z.AI";
+  if (provider === "minimax") return "MiniMax";
+  if (provider === "moonshot") return "Moonshot";
   return "Custom provider";
 }
 async function testAiProviderConnection(config) {
@@ -462,7 +532,7 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
       })
     );
     new import_obsidian.Setting(aiSection).setName("AI provider").setDesc("Choose the provider for AI-backed features.").addDropdown(
-      (dropdown) => dropdown.addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").addOption("custom", "Custom OpenAI-compatible").setValue(this.plugin.settings.aiProvider).onChange(async (value) => {
+      (dropdown) => dropdown.addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").addOption("anthropic", "Anthropic").addOption("google", "Google").addOption("zai", "Z.AI").addOption("minimax", "MiniMax").addOption("moonshot", "Moonshot").addOption("custom", "Custom OpenAI-compatible").setValue(this.plugin.settings.aiProvider).onChange(async (value) => {
         this.plugin.settings.aiProvider = value;
         await this.plugin.saveSettings();
         this.display();
@@ -500,6 +570,81 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
       new import_obsidian.Setting(aiSection).setName("OpenRouter model").addText(
         (text) => text.setValue(this.plugin.settings.openRouterModel).onChange(async (value) => {
           this.plugin.settings.openRouterModel = value.trim() || "openai/gpt-4.1-mini";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.aiProvider === "anthropic") {
+      new import_obsidian.Setting(aiSection).setName("Anthropic API key").setDesc("Uses Anthropic's OpenAI-compatible layer.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.anthropicApiKey).onChange(async (value) => {
+          this.plugin.settings.anthropicApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(aiSection).setName("Anthropic model").addText(
+        (text) => text.setValue(this.plugin.settings.anthropicModel).onChange(async (value) => {
+          this.plugin.settings.anthropicModel = value.trim() || "claude-sonnet-4-6";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.aiProvider === "google") {
+      new import_obsidian.Setting(aiSection).setName("Google API key").setDesc("Uses the Gemini OpenAI-compatible endpoint.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("AIza...").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
+          this.plugin.settings.googleApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(aiSection).setName("Google model").addText(
+        (text) => text.setValue(this.plugin.settings.googleModel).onChange(async (value) => {
+          this.plugin.settings.googleModel = value.trim() || "gemini-2.5-flash";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.aiProvider === "zai") {
+      new import_obsidian.Setting(aiSection).setName("Z.AI API key").setDesc("Uses Z.AI's OpenAI-compatible chat endpoint.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("API key").setValue(this.plugin.settings.zaiApiKey).onChange(async (value) => {
+          this.plugin.settings.zaiApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(aiSection).setName("Z.AI model").addText(
+        (text) => text.setValue(this.plugin.settings.zaiModel).onChange(async (value) => {
+          this.plugin.settings.zaiModel = value.trim() || "glm-4.5-air";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.aiProvider === "minimax") {
+      new import_obsidian.Setting(aiSection).setName("MiniMax API key").setDesc("Uses MiniMax's OpenAI-compatible chat endpoint.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("API key").setValue(this.plugin.settings.minimaxApiKey).onChange(async (value) => {
+          this.plugin.settings.minimaxApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(aiSection).setName("MiniMax model").addText(
+        (text) => text.setValue(this.plugin.settings.minimaxModel).onChange(async (value) => {
+          this.plugin.settings.minimaxModel = value.trim() || "MiniMax-M1";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.aiProvider === "moonshot") {
+      new import_obsidian.Setting(aiSection).setName("Moonshot API key").setDesc("Uses Moonshot's OpenAI-compatible Kimi endpoint.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("sk-...").setValue(this.plugin.settings.moonshotApiKey).onChange(async (value) => {
+          this.plugin.settings.moonshotApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(aiSection).setName("Moonshot model").addText(
+        (text) => text.setValue(this.plugin.settings.moonshotModel).onChange(async (value) => {
+          this.plugin.settings.moonshotModel = value.trim() || "kimi-k2.5";
           await this.plugin.saveSettings();
         })
       );

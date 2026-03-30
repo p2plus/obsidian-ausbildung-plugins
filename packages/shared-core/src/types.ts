@@ -1,7 +1,15 @@
 export type Lernstatus = "neu" | "gelesen" | "geuebt" | "sicher" | "beherrscht";
 export type Lerntyp = "theorie" | "uebung" | "quiz" | "pruefung" | "review";
 export type Pruefungsrelevanz = "niedrig" | "mittel" | "hoch" | "ihk-kritisch";
-export type AiProvider = "openai" | "openrouter" | "custom";
+export type AiProvider =
+  | "openai"
+  | "openrouter"
+  | "anthropic"
+  | "google"
+  | "zai"
+  | "minimax"
+  | "moonshot"
+  | "custom";
 
 export interface LearningNote {
   path: string;

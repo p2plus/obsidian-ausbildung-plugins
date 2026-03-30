@@ -110,6 +110,11 @@ FRAGE: Demo?
     expect(safeJsonParseWithRepair<{ ok: boolean }>('noise {"ok": true} tail')?.ok).toBe(true);
   });
 
+  it("supports the expanded AI provider union", () => {
+    const providers = ["openai", "openrouter", "anthropic", "google", "zai", "minimax", "moonshot", "custom"];
+    expect(providers).toHaveLength(8);
+  });
+
   it("updates yaml fields without duplicating frontmatter", () => {
     const markdown = `---
 status: "Aktiv"
