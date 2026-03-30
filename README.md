@@ -1,5 +1,7 @@
 # Obsidian Ausbildung Plugins
 
+> Work in progress (WIP): the repository is under active development. Interfaces, plugin scope, and release status may still change.
+
 Obsidian plugins for structured learning workflows, exam preparation, and progress tracking.
 
 The repository bundles several standalone plugins that share a small common core and the same front matter conventions.
@@ -70,6 +72,8 @@ flowchart TD
 ## Current plugins
 
 ### Stable Tier 1
+
+These are the most advanced plugins in the repository, but the repository as a whole is still WIP.
 
 - `lernfortschritt-dashboard`
 - `pruefungs-simulator`

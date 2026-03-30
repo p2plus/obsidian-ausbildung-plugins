@@ -1,5 +1,7 @@
 # Lernfortschritt Dashboard
 
+> Status: WIP. Usable, but still under active development.
+
 `lernfortschritt-dashboard` scans learning notes, reads existing front matter, and writes a compact progress snapshot for the vault.
 
 The plugin is intentionally file-based: plain markdown in, plain markdown out, and no hard dependency on `Dataview`.

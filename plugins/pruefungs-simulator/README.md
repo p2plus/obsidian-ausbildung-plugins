@@ -1,5 +1,7 @@
 # Pruefungs Simulator
 
+> Status: WIP. Core workflow is in place, but the plugin is still evolving.
+
 The simulator turns quiz notes into timed practice runs with stored results and basic performance analysis.
 
 The current implementation focuses on multiple-choice questions because they can be scored reliably and reproduced in tests.

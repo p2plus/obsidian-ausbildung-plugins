@@ -1,5 +1,7 @@
 # Lernplan Generator
 
+> Status: WIP. Planning logic is implemented, but the plugin is still being refined.
+
 `lernplan-generator` builds a markdown study plan from the exam date, available time, blocked days, and the current state of the vault.
 
 The plan is file-based and meant to stay readable without the plugin.
