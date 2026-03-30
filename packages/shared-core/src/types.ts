@@ -1,6 +1,7 @@
 export type Lernstatus = "neu" | "gelesen" | "geuebt" | "sicher" | "beherrscht";
 export type Lerntyp = "theorie" | "uebung" | "quiz" | "pruefung" | "review";
 export type Pruefungsrelevanz = "niedrig" | "mittel" | "hoch" | "ihk-kritisch";
+export type AiProvider = "openai" | "openrouter" | "custom";
 
 export interface LearningNote {
   path: string;
@@ -87,3 +88,67 @@ export interface KeywordCoverage {
   coveredPaths: string[];
 }
 
+export interface AiProviderConfig {
+  provider: AiProvider;
+  apiKey: string;
+  model: string;
+  endpoint?: string;
+  timeoutMs?: number;
+}
+
+export interface AiChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface AiGenerationRequest {
+  systemPrompt: string;
+  userPrompt: string;
+  temperature?: number;
+  responseFormat?: "json" | "text";
+}
+
+export interface AiGenerationResult<T = unknown> {
+  provider: AiProvider;
+  model: string;
+  rawText: string;
+  parsed?: T;
+}
+
+export interface ReviewPriorityExplanation {
+  notePath: string;
+  title: string;
+  priority: number;
+  reason: string;
+  recapPrompt: string;
+}
+
+export interface QuizDraftQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation?: string;
+  difficulty?: number;
+}
+
+export interface QuizGenerationMetadata {
+  sourcePath: string;
+  sourceTitle: string;
+  provider?: AiProvider;
+  model?: string;
+  generatedAt: string;
+  mode: "rule-based" | "ai-enhanced";
+  questionCount: number;
+}
+
+export interface AnalyticsInsight {
+  summary: string;
+  risks: string[];
+  nextActions: string[];
+}
+
+export interface KeywordGapSuggestion {
+  topic: string;
+  whyItMatters: string;
+  suggestedKeywords: string[];
+}

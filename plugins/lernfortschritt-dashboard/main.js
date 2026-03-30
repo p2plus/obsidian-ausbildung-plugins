@@ -174,7 +174,17 @@ var DEFAULT_BASE_SETTINGS = {
   rootFolders: ["000_Ausbildung_Industriekaufmann_2026", "quizzes"],
   dashboardFolder: "_plugin_outputs",
   periodicNotesFolder: "Periodic/Daily",
-  useDataview: true
+  useDataview: true,
+  aiEnabled: false,
+  aiProvider: "openai",
+  openAiApiKey: "",
+  openAiModel: "gpt-4.1-mini",
+  openRouterApiKey: "",
+  openRouterModel: "openai/gpt-4.1-mini",
+  customApiKey: "",
+  customModel: "gpt-4.1-mini",
+  customEndpoint: "https://api.openai.com/v1/chat/completions",
+  requestTimeoutMs: 45e3
 };
 async function scanVault(app, rootFolders) {
   const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
@@ -258,6 +268,78 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+    containerEl.createEl("h3", { text: "AI / BYOK" });
+    new import_obsidian.Setting(containerEl).setName("Enable AI features").setDesc("Use BYOK-backed AI features where the plugin supports them.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.aiEnabled).onChange(async (value) => {
+        this.plugin.settings.aiEnabled = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("AI provider").setDesc("Choose the provider for AI-backed features.").addDropdown(
+      (dropdown) => dropdown.addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").addOption("custom", "Custom OpenAI-compatible").setValue(this.plugin.settings.aiProvider).onChange(async (value) => {
+        this.plugin.settings.aiProvider = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Request timeout").setDesc("Timeout in milliseconds for provider requests.").addText(
+      (text) => text.setValue(String(this.plugin.settings.requestTimeoutMs)).onChange(async (value) => {
+        this.plugin.settings.requestTimeoutMs = Number(value) || 45e3;
+        await this.plugin.saveSettings();
+      })
+    );
+    if (this.plugin.settings.aiProvider === "openai") {
+      new import_obsidian.Setting(containerEl).setName("OpenAI API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("sk-...").setValue(this.plugin.settings.openAiApiKey).onChange(async (value) => {
+          this.plugin.settings.openAiApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(containerEl).setName("OpenAI model").addText(
+        (text) => text.setValue(this.plugin.settings.openAiModel).onChange(async (value) => {
+          this.plugin.settings.openAiModel = value.trim() || "gpt-4.1-mini";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.aiProvider === "openrouter") {
+      new import_obsidian.Setting(containerEl).setName("OpenRouter API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("sk-or-...").setValue(this.plugin.settings.openRouterApiKey).onChange(async (value) => {
+          this.plugin.settings.openRouterApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(containerEl).setName("OpenRouter model").addText(
+        (text) => text.setValue(this.plugin.settings.openRouterModel).onChange(async (value) => {
+          this.plugin.settings.openRouterModel = value.trim() || "openai/gpt-4.1-mini";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.aiProvider === "custom") {
+      new import_obsidian.Setting(containerEl).setName("Custom endpoint").setDesc("OpenAI-compatible chat completions endpoint.").addText(
+        (text) => text.setValue(this.plugin.settings.customEndpoint).onChange(async (value) => {
+          this.plugin.settings.customEndpoint = value.trim();
+          await this.plugin.saveSettings();
+        })
+      );
+      new import_obsidian.Setting(containerEl).setName("Custom API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("API key").setValue(this.plugin.settings.customApiKey).onChange(async (value) => {
+          this.plugin.settings.customApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(containerEl).setName("Custom model").addText(
+        (text) => text.setValue(this.plugin.settings.customModel).onChange(async (value) => {
+          this.plugin.settings.customModel = value.trim() || "gpt-4.1-mini";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
   }
 };
 

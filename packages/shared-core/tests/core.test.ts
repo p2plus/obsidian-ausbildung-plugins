@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAnalyticsAiRequest,
+  buildKeywordGapAiRequest,
+  buildQuizAiRequest,
   buildAnalyticsReport,
   calculateDashboardMetrics,
   calculateNextReview,
   generateQuizFromMarkdown,
   generateStudyPlan,
   gradeAttempt,
+  normalizeAnalyticsInsight,
+  normalizeKeywordGaps,
+  normalizeQuizDraftQuestions,
   parseExamMarkdown,
   parseLearningNote,
   renderDashboardMarkdown
@@ -81,5 +87,22 @@ FRAGE: Demo?
     const quiz = generateQuizFromMarkdown(demoNote, "# Demo\n## Thema\n- Punkt A");
     expect(quiz).toContain("Quiz zu");
     expect(buildAnalyticsReport([demoNote])).toContain("Ausbildungs-Analytics");
+  });
+
+  it("normalizes AI payloads", () => {
+    expect(buildQuizAiRequest(demoNote, "# Demo", 4, "AP1").responseFormat).toBe("json");
+    expect(
+      normalizeQuizDraftQuestions({
+        questions: [{ question: "Q", options: ["A", "B", "C", "D"], correctIndex: 1, explanation: "Warum" }]
+      })
+    ).toHaveLength(1);
+    expect(
+      normalizeAnalyticsInsight({ summary: "Kurz", risks: ["A"], nextActions: ["B"] })?.summary
+    ).toBe("Kurz");
+    expect(
+      normalizeKeywordGaps({ gaps: [{ topic: "Bilanz", whyItMatters: "Pruefungsrelevant", suggestedKeywords: ["Aktiva"] }] })
+    ).toHaveLength(1);
+    expect(buildAnalyticsAiRequest([demoNote], "# Bericht").responseFormat).toBe("json");
+    expect(buildKeywordGapAiRequest([{ keyword: "Bilanz", hits: 1, coveredPaths: [] }], [{ path: "a", markdown: "Bilanz" }]).responseFormat).toBe("json");
   });
 });

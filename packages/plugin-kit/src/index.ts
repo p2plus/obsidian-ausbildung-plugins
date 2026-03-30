@@ -1,18 +1,38 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
-import { LearningNote, parseLearningNote, updateYamlField } from "@ausbildung/shared-core";
+import { AiGenerationRequest, AiGenerationResult, AiProvider, AiProviderConfig, LearningNote, parseLearningNote, updateYamlField } from "@ausbildung/shared-core";
 
 export interface BasePluginSettings {
   rootFolders: string[];
   dashboardFolder: string;
   periodicNotesFolder: string;
   useDataview: boolean;
+  aiEnabled: boolean;
+  aiProvider: AiProvider;
+  openAiApiKey: string;
+  openAiModel: string;
+  openRouterApiKey: string;
+  openRouterModel: string;
+  customApiKey: string;
+  customModel: string;
+  customEndpoint: string;
+  requestTimeoutMs: number;
 }
 
 export const DEFAULT_BASE_SETTINGS: BasePluginSettings = {
   rootFolders: ["000_Ausbildung_Industriekaufmann_2026", "quizzes"],
   dashboardFolder: "_plugin_outputs",
   periodicNotesFolder: "Periodic/Daily",
-  useDataview: true
+  useDataview: true,
+  aiEnabled: false,
+  aiProvider: "openai",
+  openAiApiKey: "",
+  openAiModel: "gpt-4.1-mini",
+  openRouterApiKey: "",
+  openRouterModel: "openai/gpt-4.1-mini",
+  customApiKey: "",
+  customModel: "gpt-4.1-mini",
+  customEndpoint: "https://api.openai.com/v1/chat/completions",
+  requestTimeoutMs: 45000
 };
 
 export async function scanVault(app: App, rootFolders: string[]): Promise<Array<{ note: LearningNote; file: TFile; markdown: string }>> {
@@ -68,6 +88,112 @@ export function getDataviewApi(plugin: Plugin, useDataview: boolean): unknown | 
 
 export function noticeSuccess(message: string): void {
   new Notice(message, 4000);
+}
+
+export function getAiProviderConfig(settings: BasePluginSettings): AiProviderConfig | null {
+  if (!settings.aiEnabled) {
+    return null;
+  }
+
+  if (settings.aiProvider === "openai" && settings.openAiApiKey.trim()) {
+    return {
+      provider: "openai",
+      apiKey: settings.openAiApiKey.trim(),
+      model: settings.openAiModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+
+  if (settings.aiProvider === "openrouter" && settings.openRouterApiKey.trim()) {
+    return {
+      provider: "openrouter",
+      apiKey: settings.openRouterApiKey.trim(),
+      model: settings.openRouterModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+
+  if (settings.aiProvider === "custom" && settings.customApiKey.trim() && settings.customEndpoint.trim()) {
+    return {
+      provider: "custom",
+      apiKey: settings.customApiKey.trim(),
+      model: settings.customModel.trim(),
+      endpoint: settings.customEndpoint.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+
+  return null;
+}
+
+function getProviderEndpoint(config: AiProviderConfig): string {
+  if (config.provider === "openai") {
+    return "https://api.openai.com/v1/chat/completions";
+  }
+  if (config.provider === "openrouter") {
+    return "https://openrouter.ai/api/v1/chat/completions";
+  }
+  return config.endpoint ?? "https://api.openai.com/v1/chat/completions";
+}
+
+export async function runAiRequest<T = unknown>(config: AiProviderConfig, request: AiGenerationRequest): Promise<AiGenerationResult<T>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs ?? 45000);
+  try {
+    const body: Record<string, unknown> = {
+      model: config.model,
+      temperature: request.temperature ?? 0.2,
+      messages: [
+        { role: "system", content: request.systemPrompt },
+        { role: "user", content: request.userPrompt }
+      ]
+    };
+    if (request.responseFormat === "json") {
+      body.response_format = { type: "json_object" };
+    }
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`
+    };
+    if (config.provider === "openrouter") {
+      headers["HTTP-Referer"] = "https://github.com/p2plus/obsidian-ausbildung-plugins";
+      headers["X-Title"] = "Obsidian Ausbildung Plugins";
+    }
+
+    const response = await fetch(getProviderEndpoint(config), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const payload = await response.json() as Record<string, unknown>;
+    if (!response.ok) {
+      const message = typeof payload.error === "object" && payload.error && "message" in payload.error ? String((payload.error as Record<string, unknown>).message) : `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+    const content = (
+      (payload.choices as Array<Record<string, unknown>> | undefined)?.[0]?.message as Record<string, unknown> | undefined
+    )?.content;
+    const rawText = typeof content === "string" ? content : "";
+    const parsed = request.responseFormat === "json" ? safeJsonParse<T>(rawText) : undefined;
+    return {
+      provider: config.provider,
+      model: config.model,
+      rawText,
+      parsed
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export function safeJsonParse<T>(rawText: string): T | undefined {
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    return undefined;
+  }
 }
 
 export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSettingTab {
@@ -126,6 +252,131 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
             await this.plugin.saveSettings();
           })
       );
+
+    containerEl.createEl("h3", { text: "AI / BYOK" });
+
+    new Setting(containerEl)
+      .setName("Enable AI features")
+      .setDesc("Use BYOK-backed AI features where the plugin supports them.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.aiEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.aiEnabled = value;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("AI provider")
+      .setDesc("Choose the provider for AI-backed features.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("openai", "OpenAI")
+          .addOption("openrouter", "OpenRouter")
+          .addOption("custom", "Custom OpenAI-compatible")
+          .setValue(this.plugin.settings.aiProvider)
+          .onChange(async (value) => {
+            this.plugin.settings.aiProvider = value as AiProvider;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Request timeout")
+      .setDesc("Timeout in milliseconds for provider requests.")
+      .addText((text) =>
+        text.setValue(String(this.plugin.settings.requestTimeoutMs))
+          .onChange(async (value) => {
+            this.plugin.settings.requestTimeoutMs = Number(value) || 45000;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    if (this.plugin.settings.aiProvider === "openai") {
+      new Setting(containerEl)
+        .setName("OpenAI API key")
+        .setDesc("Stored in Obsidian plugin settings.")
+        .addText((text) => {
+          text.inputEl.type = "password";
+          return text
+            .setPlaceholder("sk-...")
+            .setValue(this.plugin.settings.openAiApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.openAiApiKey = value;
+              await this.plugin.saveSettings();
+            });
+        });
+      new Setting(containerEl)
+        .setName("OpenAI model")
+        .addText((text) =>
+          text.setValue(this.plugin.settings.openAiModel)
+            .onChange(async (value) => {
+              this.plugin.settings.openAiModel = value.trim() || "gpt-4.1-mini";
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    if (this.plugin.settings.aiProvider === "openrouter") {
+      new Setting(containerEl)
+        .setName("OpenRouter API key")
+        .setDesc("Stored in Obsidian plugin settings.")
+        .addText((text) => {
+          text.inputEl.type = "password";
+          return text
+            .setPlaceholder("sk-or-...")
+            .setValue(this.plugin.settings.openRouterApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.openRouterApiKey = value;
+              await this.plugin.saveSettings();
+            });
+        });
+      new Setting(containerEl)
+        .setName("OpenRouter model")
+        .addText((text) =>
+          text.setValue(this.plugin.settings.openRouterModel)
+            .onChange(async (value) => {
+              this.plugin.settings.openRouterModel = value.trim() || "openai/gpt-4.1-mini";
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    if (this.plugin.settings.aiProvider === "custom") {
+      new Setting(containerEl)
+        .setName("Custom endpoint")
+        .setDesc("OpenAI-compatible chat completions endpoint.")
+        .addText((text) =>
+          text.setValue(this.plugin.settings.customEndpoint)
+            .onChange(async (value) => {
+              this.plugin.settings.customEndpoint = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+      new Setting(containerEl)
+        .setName("Custom API key")
+        .setDesc("Stored in Obsidian plugin settings.")
+        .addText((text) => {
+          text.inputEl.type = "password";
+          return text
+            .setPlaceholder("API key")
+            .setValue(this.plugin.settings.customApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.customApiKey = value;
+              await this.plugin.saveSettings();
+            });
+        });
+      new Setting(containerEl)
+        .setName("Custom model")
+        .addText((text) =>
+          text.setValue(this.plugin.settings.customModel)
+            .onChange(async (value) => {
+              this.plugin.settings.customModel = value.trim() || "gpt-4.1-mini";
+              await this.plugin.saveSettings();
+            })
+        );
+    }
   }
 }
-

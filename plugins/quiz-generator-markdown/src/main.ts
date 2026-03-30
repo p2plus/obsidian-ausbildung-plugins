@@ -1,14 +1,20 @@
-import { Notice, Plugin } from "obsidian";
-import { generateQuizFromMarkdown, parseLearningNote } from "@ausbildung/shared-core";
-import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, writePluginOutput } from "@ausbildung/plugin-kit";
+import { Notice, Plugin, Setting } from "obsidian";
+import { buildQuizAiRequest, generateQuizFromMarkdown, normalizeQuizDraftQuestions, parseLearningNote, QuizDraftQuestion } from "@ausbildung/shared-core";
+import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, runAiRequest, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface QuizSettings extends BasePluginSettings {
   outputFolder: string;
+  questionCount: number;
+  examLevel: string;
+  generationMode: "rule-based" | "ai-enhanced";
 }
 
 const DEFAULT_SETTINGS: QuizSettings = {
   ...DEFAULT_BASE_SETTINGS,
-  outputFolder: "quizzes"
+  outputFolder: "quizzes",
+  questionCount: 5,
+  examLevel: "AP1",
+  generationMode: "ai-enhanced"
 };
 
 export default class QuizGeneratorMarkdownPlugin extends Plugin {
@@ -21,7 +27,7 @@ export default class QuizGeneratorMarkdownPlugin extends Plugin {
       name: "Quiz: Aus aktueller Notiz erzeugen",
       callback: () => void this.generateFromCurrent()
     });
-    this.addSettingTab(new BaseSettingsTab(this.app, this));
+    this.addSettingTab(new QuizSettingsTab(this.app, this));
   }
 
   async loadSettings(): Promise<void> {
@@ -40,8 +46,106 @@ export default class QuizGeneratorMarkdownPlugin extends Plugin {
     }
     const markdown = await this.app.vault.cachedRead(file);
     const note = parseLearningNote(file.path, markdown);
-    const quizMarkdown = generateQuizFromMarkdown(note, markdown);
+    let quizMarkdown = generateQuizFromMarkdown(note, markdown);
+    const provider = getAiProviderConfig(this.settings);
+    if (this.settings.generationMode === "ai-enhanced" && provider) {
+      try {
+        const response = await runAiRequest<{ questions?: unknown[] }>(
+          provider,
+          buildQuizAiRequest(note, markdown, this.settings.questionCount, this.settings.examLevel)
+        );
+        const questions = normalizeQuizDraftQuestions(response.parsed);
+        if (questions.length > 0) {
+          quizMarkdown = this.renderAiQuiz(note.title, note.modul_id ?? "UNSORTIERT", questions, provider.provider, provider.model, file.path);
+        }
+      } catch (error) {
+        new Notice(`AI-Quizerzeugung fehlgeschlagen, nutze Regelmodus: ${String(error)}`);
+      }
+    }
     const path = await writePluginOutput(this.app, this.settings.outputFolder, `${file.basename}-quiz.md`, quizMarkdown);
     new Notice(`Quiz erzeugt: ${path}`);
+  }
+
+  private renderAiQuiz(title: string, modulId: string, questions: QuizDraftQuestion[], provider: string, model: string, sourcePath: string): string {
+    const lines = [
+      "---",
+      'status: "Entwurf"',
+      'lerntyp: "quiz"',
+      `modul_id: "${modulId}"`,
+      'pruefungsrelevanz: "hoch"',
+      `source_note: "${sourcePath}"`,
+      `quiz_origin: "ai-enhanced"`,
+      `last_ai_generated: "${new Date().toISOString()}"`,
+      `ai_provider: "${provider}"`,
+      `ai_model: "${model}"`,
+      "---",
+      "",
+      `# Quiz zu ${title}`,
+      ""
+    ];
+    questions.forEach((question, index) => {
+      lines.push(`## Frage ${index + 1}`);
+      lines.push("");
+      lines.push("TYPE: mc");
+      lines.push(`PUNKTE: ${question.difficulty && question.difficulty >= 4 ? 2 : 1}`);
+      lines.push(`FRAGE: ${question.question}`);
+      question.options.forEach((option, optionIndex) => {
+        lines.push(`- [${optionIndex === question.correctIndex ? "x" : " "}] ${option}`);
+      });
+      if (question.explanation) {
+        lines.push("");
+        lines.push(`ERKLAERUNG: ${question.explanation}`);
+      }
+      lines.push("");
+    });
+    return lines.join("\n");
+  }
+}
+
+class QuizSettingsTab extends BaseSettingsTab<QuizSettings> {
+  override display(): void {
+    super.display();
+    const { containerEl } = this;
+    containerEl.createEl("h3", { text: "Quiz Generation" });
+    new Setting(containerEl)
+      .setName("Output folder")
+      .addText((text) =>
+        text.setValue(this.plugin.settings.outputFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.outputFolder = value.trim() || "quizzes";
+            await this.plugin.saveSettings();
+          })
+      );
+    new Setting(containerEl)
+      .setName("Question count")
+      .addText((text) =>
+        text.setValue(String(this.plugin.settings.questionCount))
+          .onChange(async (value) => {
+            this.plugin.settings.questionCount = Number(value) || 5;
+            await this.plugin.saveSettings();
+          })
+      );
+    new Setting(containerEl)
+      .setName("Exam level")
+      .addText((text) =>
+        text.setValue(this.plugin.settings.examLevel)
+          .onChange(async (value) => {
+            this.plugin.settings.examLevel = value.trim() || "AP1";
+            await this.plugin.saveSettings();
+          })
+      );
+    new Setting(containerEl)
+      .setName("Generation mode")
+      .setDesc("Use AI when enabled and configured, otherwise stay rule-based.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("rule-based", "Rule-based")
+          .addOption("ai-enhanced", "AI-enhanced")
+          .setValue(this.plugin.settings.generationMode)
+          .onChange(async (value) => {
+            this.plugin.settings.generationMode = value as "rule-based" | "ai-enhanced";
+            await this.plugin.saveSettings();
+          })
+      );
   }
 }

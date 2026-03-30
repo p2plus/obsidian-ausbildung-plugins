@@ -25,6 +25,50 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var import_obsidian2 = require("obsidian");
 
+// ../../packages/shared-core/src/ai.ts
+function clamp(text, maxLength = 8e3) {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}
+...` : text;
+}
+function buildKeywordGapAiRequest(coverage, sampleNotes) {
+  return {
+    systemPrompt: "You analyze topic gaps in study material. Return strict JSON only.",
+    userPrompt: clamp(
+      JSON.stringify({
+        task: "Find likely missing or weakly covered topics based on explicit keyword coverage and note excerpts.",
+        constraints: [
+          "Return JSON with a top-level 'gaps' array.",
+          "Each gap needs topic, whyItMatters, suggestedKeywords."
+        ],
+        coverage,
+        samples: sampleNotes.slice(0, 10).map((entry) => ({
+          path: entry.path,
+          excerpt: entry.markdown.slice(0, 1200)
+        }))
+      })
+    ),
+    temperature: 0.3,
+    responseFormat: "json"
+  };
+}
+function normalizeKeywordGaps(payload) {
+  const gaps = payload?.gaps;
+  if (!Array.isArray(gaps)) {
+    return [];
+  }
+  return gaps.flatMap((item) => {
+    const record = item;
+    if (typeof record.topic !== "string" || typeof record.whyItMatters !== "string" || !Array.isArray(record.suggestedKeywords)) {
+      return [];
+    }
+    return [{
+      topic: record.topic,
+      whyItMatters: record.whyItMatters,
+      suggestedKeywords: record.suggestedKeywords.filter((entry) => typeof entry === "string")
+    }];
+  });
+}
+
 // ../../packages/shared-core/src/notes.ts
 var FRONTMATTER_DELIMITER = "---";
 function parseScalarValue(raw) {
@@ -113,7 +157,17 @@ var DEFAULT_BASE_SETTINGS = {
   rootFolders: ["000_Ausbildung_Industriekaufmann_2026", "quizzes"],
   dashboardFolder: "_plugin_outputs",
   periodicNotesFolder: "Periodic/Daily",
-  useDataview: true
+  useDataview: true,
+  aiEnabled: false,
+  aiProvider: "openai",
+  openAiApiKey: "",
+  openAiModel: "gpt-4.1-mini",
+  openRouterApiKey: "",
+  openRouterModel: "openai/gpt-4.1-mini",
+  customApiKey: "",
+  customModel: "gpt-4.1-mini",
+  customEndpoint: "https://api.openai.com/v1/chat/completions",
+  requestTimeoutMs: 45e3
 };
 async function scanVault(app, rootFolders) {
   const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
@@ -149,13 +203,101 @@ async function writePluginOutput(app, folderPath, fileName, content) {
   }
   return path;
 }
-
-// src/main.ts
-var DEFAULT_SETTINGS = {
-  ...DEFAULT_BASE_SETTINGS,
-  keywords: ["Deckungsbeitrag", "Bilanz", "BBiG", "SWOT"]
-};
-var KeywordSettingsTab = class extends import_obsidian2.PluginSettingTab {
+function getAiProviderConfig(settings) {
+  if (!settings.aiEnabled) {
+    return null;
+  }
+  if (settings.aiProvider === "openai" && settings.openAiApiKey.trim()) {
+    return {
+      provider: "openai",
+      apiKey: settings.openAiApiKey.trim(),
+      model: settings.openAiModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "openrouter" && settings.openRouterApiKey.trim()) {
+    return {
+      provider: "openrouter",
+      apiKey: settings.openRouterApiKey.trim(),
+      model: settings.openRouterModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "custom" && settings.customApiKey.trim() && settings.customEndpoint.trim()) {
+    return {
+      provider: "custom",
+      apiKey: settings.customApiKey.trim(),
+      model: settings.customModel.trim(),
+      endpoint: settings.customEndpoint.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  return null;
+}
+function getProviderEndpoint(config) {
+  if (config.provider === "openai") {
+    return "https://api.openai.com/v1/chat/completions";
+  }
+  if (config.provider === "openrouter") {
+    return "https://openrouter.ai/api/v1/chat/completions";
+  }
+  return config.endpoint ?? "https://api.openai.com/v1/chat/completions";
+}
+async function runAiRequest(config, request) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs ?? 45e3);
+  try {
+    const body = {
+      model: config.model,
+      temperature: request.temperature ?? 0.2,
+      messages: [
+        { role: "system", content: request.systemPrompt },
+        { role: "user", content: request.userPrompt }
+      ]
+    };
+    if (request.responseFormat === "json") {
+      body.response_format = { type: "json_object" };
+    }
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`
+    };
+    if (config.provider === "openrouter") {
+      headers["HTTP-Referer"] = "https://github.com/p2plus/obsidian-ausbildung-plugins";
+      headers["X-Title"] = "Obsidian Ausbildung Plugins";
+    }
+    const response = await fetch(getProviderEndpoint(config), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      const message = typeof payload.error === "object" && payload.error && "message" in payload.error ? String(payload.error.message) : `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+    const content = payload.choices?.[0]?.message?.content;
+    const rawText = typeof content === "string" ? content : "";
+    const parsed = request.responseFormat === "json" ? safeJsonParse(rawText) : void 0;
+    return {
+      provider: config.provider,
+      model: config.model,
+      rawText,
+      parsed
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+function safeJsonParse(rawText) {
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    return void 0;
+  }
+}
+var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -163,9 +305,133 @@ var KeywordSettingsTab = class extends import_obsidian2.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
+    containerEl.createEl("h2", { text: this.plugin.manifest.name });
+    new import_obsidian.Setting(containerEl).setName("Root folders").setDesc("Comma-separated root folders to scan for notes.").addText(
+      (text) => text.setValue(this.plugin.settings.rootFolders.join(", ")).onChange(async (value) => {
+        this.plugin.settings.rootFolders = value.split(",").map((entry) => entry.trim()).filter(Boolean);
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Output folder").setDesc("Where generated markdown dashboards and plans should be written.").addText(
+      (text) => text.setValue(this.plugin.settings.dashboardFolder).onChange(async (value) => {
+        this.plugin.settings.dashboardFolder = value.trim() || "_plugin_outputs";
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Periodic notes folder").setDesc("Folder used for review queues and study journal integration.").addText(
+      (text) => text.setValue(this.plugin.settings.periodicNotesFolder).onChange(async (value) => {
+        this.plugin.settings.periodicNotesFolder = value.trim() || "Periodic/Daily";
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Prefer Dataview").setDesc("Use Dataview when available, but keep a safe fallback.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.useDataview).onChange(async (value) => {
+        this.plugin.settings.useDataview = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("h3", { text: "AI / BYOK" });
+    new import_obsidian.Setting(containerEl).setName("Enable AI features").setDesc("Use BYOK-backed AI features where the plugin supports them.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.aiEnabled).onChange(async (value) => {
+        this.plugin.settings.aiEnabled = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("AI provider").setDesc("Choose the provider for AI-backed features.").addDropdown(
+      (dropdown) => dropdown.addOption("openai", "OpenAI").addOption("openrouter", "OpenRouter").addOption("custom", "Custom OpenAI-compatible").setValue(this.plugin.settings.aiProvider).onChange(async (value) => {
+        this.plugin.settings.aiProvider = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Request timeout").setDesc("Timeout in milliseconds for provider requests.").addText(
+      (text) => text.setValue(String(this.plugin.settings.requestTimeoutMs)).onChange(async (value) => {
+        this.plugin.settings.requestTimeoutMs = Number(value) || 45e3;
+        await this.plugin.saveSettings();
+      })
+    );
+    if (this.plugin.settings.aiProvider === "openai") {
+      new import_obsidian.Setting(containerEl).setName("OpenAI API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("sk-...").setValue(this.plugin.settings.openAiApiKey).onChange(async (value) => {
+          this.plugin.settings.openAiApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(containerEl).setName("OpenAI model").addText(
+        (text) => text.setValue(this.plugin.settings.openAiModel).onChange(async (value) => {
+          this.plugin.settings.openAiModel = value.trim() || "gpt-4.1-mini";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.aiProvider === "openrouter") {
+      new import_obsidian.Setting(containerEl).setName("OpenRouter API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("sk-or-...").setValue(this.plugin.settings.openRouterApiKey).onChange(async (value) => {
+          this.plugin.settings.openRouterApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(containerEl).setName("OpenRouter model").addText(
+        (text) => text.setValue(this.plugin.settings.openRouterModel).onChange(async (value) => {
+          this.plugin.settings.openRouterModel = value.trim() || "openai/gpt-4.1-mini";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.aiProvider === "custom") {
+      new import_obsidian.Setting(containerEl).setName("Custom endpoint").setDesc("OpenAI-compatible chat completions endpoint.").addText(
+        (text) => text.setValue(this.plugin.settings.customEndpoint).onChange(async (value) => {
+          this.plugin.settings.customEndpoint = value.trim();
+          await this.plugin.saveSettings();
+        })
+      );
+      new import_obsidian.Setting(containerEl).setName("Custom API key").setDesc("Stored in Obsidian plugin settings.").addText((text) => {
+        text.inputEl.type = "password";
+        return text.setPlaceholder("API key").setValue(this.plugin.settings.customApiKey).onChange(async (value) => {
+          this.plugin.settings.customApiKey = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian.Setting(containerEl).setName("Custom model").addText(
+        (text) => text.setValue(this.plugin.settings.customModel).onChange(async (value) => {
+          this.plugin.settings.customModel = value.trim() || "gpt-4.1-mini";
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+  }
+};
+
+// src/main.ts
+var DEFAULT_SETTINGS = {
+  ...DEFAULT_BASE_SETTINGS,
+  keywords: ["Deckungsbeitrag", "Bilanz", "BBiG", "SWOT"],
+  aliasGroups: ["Deckungsbeitrag:DB, contribution margin", "Bilanz:balance sheet"],
+  minHits: 1
+};
+var KeywordSettingsTab = class extends BaseSettingsTab {
+  display() {
+    super.display();
+    const { containerEl } = this;
+    containerEl.createEl("h3", { text: "Keyword Tracking" });
     new import_obsidian2.Setting(containerEl).setName("Keywords").setDesc("Comma-separated IHK-relevant keywords").addText(
       (text) => text.setValue(this.plugin.settings.keywords.join(", ")).onChange(async (value) => {
         this.plugin.settings.keywords = value.split(",").map((entry) => entry.trim()).filter(Boolean);
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Alias groups").setDesc("One group per line: canonical:alias1,alias2").addTextArea(
+      (text) => text.setValue(this.plugin.settings.aliasGroups.join("\n")).onChange(async (value) => {
+        this.plugin.settings.aliasGroups = value.split("\n").map((entry) => entry.trim()).filter(Boolean);
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Minimum hits before warning").addText(
+      (text) => text.setValue(String(this.plugin.settings.minHits)).onChange(async (value) => {
+        this.plugin.settings.minHits = Number(value) || 1;
         await this.plugin.saveSettings();
       })
     );
@@ -189,12 +455,51 @@ var KeywordTrackerPlugin = class extends import_obsidian2.Plugin {
   }
   async generateReport() {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
-    const coverage = computeKeywordCoverage(scanned, this.settings.keywords);
-    const markdown = [
+    const expandedKeywords = this.expandKeywords();
+    const coverage = computeKeywordCoverage(scanned, expandedKeywords);
+    let markdown = [
       "# IHK Keyword Coverage",
       "",
-      ...coverage.map((entry) => `- ${entry.keyword}: ${entry.hits} Treffer${entry.hits === 0 ? " (unterrepraesentiert)" : ""}`)
+      ...coverage.map((entry) => `- ${entry.keyword}: ${entry.hits} Treffer${entry.hits < this.settings.minHits ? " (unterrepraesentiert)" : ""}`)
     ].join("\n");
+    const provider = getAiProviderConfig(this.settings);
+    if (provider) {
+      try {
+        const response = await runAiRequest(provider, buildKeywordGapAiRequest(
+          coverage,
+          scanned.slice(0, 12).map((entry) => ({ path: entry.note.path, markdown: entry.markdown }))
+        ));
+        const gaps = normalizeKeywordGaps(response.parsed);
+        if (gaps.length > 0) {
+          markdown += [
+            "",
+            "## Themenluecken",
+            ...gaps.flatMap((gap) => [
+              `- ${gap.topic}: ${gap.whyItMatters}`,
+              `  - Vorschlaege: ${gap.suggestedKeywords.join(", ")}`
+            ])
+          ].join("\n");
+        }
+      } catch (error) {
+        markdown += `
+
+## AI-Hinweis
+- Themenanalyse nicht verfuegbar: ${String(error)}`;
+      }
+    }
     await writePluginOutput(this.app, this.settings.dashboardFolder, "keyword-coverage.md", markdown);
+  }
+  expandKeywords() {
+    const expanded = new Set(this.settings.keywords);
+    for (const group of this.settings.aliasGroups) {
+      const [canonical, aliasesRaw] = group.split(":");
+      if (canonical?.trim()) {
+        expanded.add(canonical.trim());
+      }
+      if (aliasesRaw) {
+        aliasesRaw.split(",").map((entry) => entry.trim()).filter(Boolean).forEach((entry) => expanded.add(entry));
+      }
+    }
+    return [...expanded];
   }
 };

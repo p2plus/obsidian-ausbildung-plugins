@@ -153,7 +153,17 @@ var DEFAULT_BASE_SETTINGS = {
   rootFolders: ["000_Ausbildung_Industriekaufmann_2026", "quizzes"],
   dashboardFolder: "_plugin_outputs",
   periodicNotesFolder: "Periodic/Daily",
-  useDataview: true
+  useDataview: true,
+  aiEnabled: false,
+  aiProvider: "openai",
+  openAiApiKey: "",
+  openAiModel: "gpt-4.1-mini",
+  openRouterApiKey: "",
+  openRouterModel: "openai/gpt-4.1-mini",
+  customApiKey: "",
+  customModel: "gpt-4.1-mini",
+  customEndpoint: "https://api.openai.com/v1/chat/completions",
+  requestTimeoutMs: 45e3
 };
 async function scanVault(app, rootFolders) {
   const files = app.vault.getMarkdownFiles().filter((file) => rootFolders.some((folder) => file.path.startsWith(folder)));
