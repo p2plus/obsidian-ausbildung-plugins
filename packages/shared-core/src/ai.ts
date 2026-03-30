@@ -12,6 +12,15 @@ function clamp(text: string, maxLength = 8000): string {
   return text.length > maxLength ? `${text.slice(0, maxLength)}\n...` : text;
 }
 
+function extractJsonObject(rawText: string): string | null {
+  const start = rawText.indexOf("{");
+  const end = rawText.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    return null;
+  }
+  return rawText.slice(start, end + 1);
+}
+
 export function buildQuizAiRequest(note: LearningNote, markdown: string, questionCount: number, examLevel: string): AiGenerationRequest {
   return {
     systemPrompt: "You create exam-style multiple choice questions from study notes. Return strict JSON only.",
@@ -191,4 +200,20 @@ export function normalizeReviewPriority(payload: unknown): ReviewPriorityExplana
       recapPrompt: record.recapPrompt
     }];
   });
+}
+
+export function safeJsonParseWithRepair<T>(rawText: string): T | undefined {
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    const extracted = extractJsonObject(rawText);
+    if (!extracted) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(extracted) as T;
+    } catch {
+      return undefined;
+    }
+  }
 }

@@ -30,6 +30,14 @@ function clamp(text, maxLength = 8e3) {
   return text.length > maxLength ? `${text.slice(0, maxLength)}
 ...` : text;
 }
+function extractJsonObject(rawText) {
+  const start = rawText.indexOf("{");
+  const end = rawText.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    return null;
+  }
+  return rawText.slice(start, end + 1);
+}
 function buildQuizAiRequest(note, markdown, questionCount, examLevel) {
   return {
     systemPrompt: "You create exam-style multiple choice questions from study notes. Return strict JSON only.",
@@ -78,6 +86,21 @@ function normalizeQuizDraftQuestions(payload) {
       difficulty: typeof record.difficulty === "number" ? record.difficulty : void 0
     }];
   });
+}
+function safeJsonParseWithRepair(rawText) {
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    const extracted = extractJsonObject(rawText);
+    if (!extracted) {
+      return void 0;
+    }
+    try {
+      return JSON.parse(extracted);
+    } catch {
+      return void 0;
+    }
+  }
 }
 
 // ../../packages/shared-core/src/notes.ts
@@ -220,6 +243,12 @@ async function writePluginOutput(app, folderPath, fileName, content) {
   }
   return path;
 }
+function noticeSuccess(message) {
+  new import_obsidian.Notice(message, 4e3);
+}
+function noticeError(message) {
+  new import_obsidian.Notice(message, 7e3);
+}
 function getAiProviderConfig(settings) {
   if (!settings.aiEnabled) {
     return null;
@@ -291,12 +320,12 @@ async function runAiRequest(config, request) {
     });
     const payload = await response.json();
     if (!response.ok) {
-      const message = typeof payload.error === "object" && payload.error && "message" in payload.error ? String(payload.error.message) : `HTTP ${response.status}`;
+      const message = typeof payload.error === "object" && payload.error && "message" in payload.error ? String(payload.error.message) : providerErrorMessage(config.provider, response.status);
       throw new Error(message);
     }
     const content = payload.choices?.[0]?.message?.content;
     const rawText = typeof content === "string" ? content : "";
-    const parsed = request.responseFormat === "json" ? safeJsonParse(rawText) : void 0;
+    const parsed = request.responseFormat === "json" ? safeJsonParseWithRepair(rawText) : void 0;
     return {
       provider: config.provider,
       model: config.model,
@@ -307,12 +336,42 @@ async function runAiRequest(config, request) {
     clearTimeout(timeout);
   }
 }
-function safeJsonParse(rawText) {
-  try {
-    return JSON.parse(rawText);
-  } catch {
-    return void 0;
+function providerErrorMessage(provider, status) {
+  if (status === 401) {
+    return `${providerLabel(provider)} rejected the API key.`;
   }
+  if (status === 403) {
+    return `${providerLabel(provider)} refused the request. Check account access or model permissions.`;
+  }
+  if (status === 404) {
+    return `${providerLabel(provider)} endpoint or model was not found.`;
+  }
+  if (status === 429) {
+    return `${providerLabel(provider)} rate limit reached.`;
+  }
+  if (status >= 500) {
+    return `${providerLabel(provider)} returned a server error (${status}).`;
+  }
+  return `${providerLabel(provider)} request failed with HTTP ${status}.`;
+}
+function providerLabel(provider) {
+  if (provider === "openai") return "OpenAI";
+  if (provider === "openrouter") return "OpenRouter";
+  return "Custom provider";
+}
+async function testAiProviderConnection(config) {
+  const result = await runAiRequest(config, {
+    systemPrompt: "You are a connectivity check. Return strict JSON only.",
+    userPrompt: JSON.stringify({
+      task: 'Return {"ok": true} and nothing else.'
+    }),
+    temperature: 0,
+    responseFormat: "json"
+  });
+  if (result.parsed && typeof result.parsed === "object" && "ok" in result.parsed) {
+    return `Connected to ${providerLabel(config.provider)} using ${config.model}.`;
+  }
+  return `Connected to ${providerLabel(config.provider)} using ${config.model}, but the response format was unusual.`;
 }
 var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -419,6 +478,26 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
         })
       );
     }
+    new import_obsidian.Setting(containerEl).setName("Test AI connection").setDesc("Checks the currently selected provider, model, and key.").addButton(
+      (button) => button.setButtonText("Run test").onClick(async () => {
+        const config = getAiProviderConfig(this.plugin.settings);
+        if (!config) {
+          noticeError("AI is disabled or the selected provider is missing required credentials.");
+          return;
+        }
+        button.setDisabled(true);
+        button.setButtonText("Testing...");
+        try {
+          const message = await testAiProviderConnection(config);
+          noticeSuccess(message);
+        } catch (error) {
+          noticeError(`AI connection test failed: ${String(error)}`);
+        } finally {
+          button.setDisabled(false);
+          button.setButtonText("Run test");
+        }
+      })
+    );
   }
 };
 

@@ -14,7 +14,8 @@ import {
   normalizeQuizDraftQuestions,
   parseExamMarkdown,
   parseLearningNote,
-  renderDashboardMarkdown
+  renderDashboardMarkdown,
+  safeJsonParseWithRepair
 } from "../src/index";
 
 const demoNote = parseLearningNote(
@@ -104,5 +105,6 @@ FRAGE: Demo?
     ).toHaveLength(1);
     expect(buildAnalyticsAiRequest([demoNote], "# Bericht").responseFormat).toBe("json");
     expect(buildKeywordGapAiRequest([{ keyword: "Bilanz", hits: 1, coveredPaths: [] }], [{ path: "a", markdown: "Bilanz" }]).responseFormat).toBe("json");
+    expect(safeJsonParseWithRepair<{ ok: boolean }>('noise {"ok": true} tail')?.ok).toBe(true);
   });
 });

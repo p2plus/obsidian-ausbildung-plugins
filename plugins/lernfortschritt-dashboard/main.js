@@ -25,6 +25,31 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var import_obsidian2 = require("obsidian");
 
+// ../../packages/shared-core/src/ai.ts
+function extractJsonObject(rawText) {
+  const start = rawText.indexOf("{");
+  const end = rawText.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    return null;
+  }
+  return rawText.slice(start, end + 1);
+}
+function safeJsonParseWithRepair(rawText) {
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    const extracted = extractJsonObject(rawText);
+    if (!extracted) {
+      return void 0;
+    }
+    try {
+      return JSON.parse(extracted);
+    } catch {
+      return void 0;
+    }
+  }
+}
+
 // ../../packages/shared-core/src/dashboard.ts
 function calculateDashboardMetrics(notes, today = /* @__PURE__ */ new Date()) {
   const byStatus = {};
@@ -235,6 +260,133 @@ function getDataviewApi(plugin, useDataview) {
 function noticeSuccess(message) {
   new import_obsidian.Notice(message, 4e3);
 }
+function noticeError(message) {
+  new import_obsidian.Notice(message, 7e3);
+}
+function getAiProviderConfig(settings) {
+  if (!settings.aiEnabled) {
+    return null;
+  }
+  if (settings.aiProvider === "openai" && settings.openAiApiKey.trim()) {
+    return {
+      provider: "openai",
+      apiKey: settings.openAiApiKey.trim(),
+      model: settings.openAiModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "openrouter" && settings.openRouterApiKey.trim()) {
+    return {
+      provider: "openrouter",
+      apiKey: settings.openRouterApiKey.trim(),
+      model: settings.openRouterModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "custom" && settings.customApiKey.trim() && settings.customEndpoint.trim()) {
+    return {
+      provider: "custom",
+      apiKey: settings.customApiKey.trim(),
+      model: settings.customModel.trim(),
+      endpoint: settings.customEndpoint.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  return null;
+}
+function getProviderEndpoint(config) {
+  if (config.provider === "openai") {
+    return "https://api.openai.com/v1/chat/completions";
+  }
+  if (config.provider === "openrouter") {
+    return "https://openrouter.ai/api/v1/chat/completions";
+  }
+  return config.endpoint ?? "https://api.openai.com/v1/chat/completions";
+}
+async function runAiRequest(config, request) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs ?? 45e3);
+  try {
+    const body = {
+      model: config.model,
+      temperature: request.temperature ?? 0.2,
+      messages: [
+        { role: "system", content: request.systemPrompt },
+        { role: "user", content: request.userPrompt }
+      ]
+    };
+    if (request.responseFormat === "json") {
+      body.response_format = { type: "json_object" };
+    }
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`
+    };
+    if (config.provider === "openrouter") {
+      headers["HTTP-Referer"] = "https://github.com/p2plus/obsidian-ausbildung-plugins";
+      headers["X-Title"] = "Obsidian Ausbildung Plugins";
+    }
+    const response = await fetch(getProviderEndpoint(config), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      const message = typeof payload.error === "object" && payload.error && "message" in payload.error ? String(payload.error.message) : providerErrorMessage(config.provider, response.status);
+      throw new Error(message);
+    }
+    const content = payload.choices?.[0]?.message?.content;
+    const rawText = typeof content === "string" ? content : "";
+    const parsed = request.responseFormat === "json" ? safeJsonParseWithRepair(rawText) : void 0;
+    return {
+      provider: config.provider,
+      model: config.model,
+      rawText,
+      parsed
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+function providerErrorMessage(provider, status) {
+  if (status === 401) {
+    return `${providerLabel(provider)} rejected the API key.`;
+  }
+  if (status === 403) {
+    return `${providerLabel(provider)} refused the request. Check account access or model permissions.`;
+  }
+  if (status === 404) {
+    return `${providerLabel(provider)} endpoint or model was not found.`;
+  }
+  if (status === 429) {
+    return `${providerLabel(provider)} rate limit reached.`;
+  }
+  if (status >= 500) {
+    return `${providerLabel(provider)} returned a server error (${status}).`;
+  }
+  return `${providerLabel(provider)} request failed with HTTP ${status}.`;
+}
+function providerLabel(provider) {
+  if (provider === "openai") return "OpenAI";
+  if (provider === "openrouter") return "OpenRouter";
+  return "Custom provider";
+}
+async function testAiProviderConnection(config) {
+  const result = await runAiRequest(config, {
+    systemPrompt: "You are a connectivity check. Return strict JSON only.",
+    userPrompt: JSON.stringify({
+      task: 'Return {"ok": true} and nothing else.'
+    }),
+    temperature: 0,
+    responseFormat: "json"
+  });
+  if (result.parsed && typeof result.parsed === "object" && "ok" in result.parsed) {
+    return `Connected to ${providerLabel(config.provider)} using ${config.model}.`;
+  }
+  return `Connected to ${providerLabel(config.provider)} using ${config.model}, but the response format was unusual.`;
+}
 var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
@@ -340,6 +492,26 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
         })
       );
     }
+    new import_obsidian.Setting(containerEl).setName("Test AI connection").setDesc("Checks the currently selected provider, model, and key.").addButton(
+      (button) => button.setButtonText("Run test").onClick(async () => {
+        const config = getAiProviderConfig(this.plugin.settings);
+        if (!config) {
+          noticeError("AI is disabled or the selected provider is missing required credentials.");
+          return;
+        }
+        button.setDisabled(true);
+        button.setButtonText("Testing...");
+        try {
+          const message = await testAiProviderConnection(config);
+          noticeSuccess(message);
+        } catch (error) {
+          noticeError(`AI connection test failed: ${String(error)}`);
+        } finally {
+          button.setDisabled(false);
+          button.setButtonText("Run test");
+        }
+      })
+    );
   }
 };
 

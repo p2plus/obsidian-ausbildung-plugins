@@ -1,5 +1,5 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
-import { AiGenerationRequest, AiGenerationResult, AiProvider, AiProviderConfig, LearningNote, parseLearningNote, updateYamlField } from "@ausbildung/shared-core";
+import { AiGenerationRequest, AiGenerationResult, AiProvider, AiProviderConfig, LearningNote, parseLearningNote, safeJsonParseWithRepair, updateYamlField } from "@ausbildung/shared-core";
 
 export interface BasePluginSettings {
   rootFolders: string[];
@@ -90,6 +90,10 @@ export function noticeSuccess(message: string): void {
   new Notice(message, 4000);
 }
 
+export function noticeError(message: string): void {
+  new Notice(message, 7000);
+}
+
 export function getAiProviderConfig(settings: BasePluginSettings): AiProviderConfig | null {
   if (!settings.aiEnabled) {
     return null;
@@ -169,14 +173,17 @@ export async function runAiRequest<T = unknown>(config: AiProviderConfig, reques
     });
     const payload = await response.json() as Record<string, unknown>;
     if (!response.ok) {
-      const message = typeof payload.error === "object" && payload.error && "message" in payload.error ? String((payload.error as Record<string, unknown>).message) : `HTTP ${response.status}`;
+      const message =
+        typeof payload.error === "object" && payload.error && "message" in payload.error
+          ? String((payload.error as Record<string, unknown>).message)
+          : providerErrorMessage(config.provider, response.status);
       throw new Error(message);
     }
     const content = (
       (payload.choices as Array<Record<string, unknown>> | undefined)?.[0]?.message as Record<string, unknown> | undefined
     )?.content;
     const rawText = typeof content === "string" ? content : "";
-    const parsed = request.responseFormat === "json" ? safeJsonParse<T>(rawText) : undefined;
+    const parsed = request.responseFormat === "json" ? safeJsonParseWithRepair<T>(rawText) : undefined;
     return {
       provider: config.provider,
       model: config.model,
@@ -194,6 +201,46 @@ export function safeJsonParse<T>(rawText: string): T | undefined {
   } catch {
     return undefined;
   }
+}
+
+function providerErrorMessage(provider: AiProvider, status: number): string {
+  if (status === 401) {
+    return `${providerLabel(provider)} rejected the API key.`;
+  }
+  if (status === 403) {
+    return `${providerLabel(provider)} refused the request. Check account access or model permissions.`;
+  }
+  if (status === 404) {
+    return `${providerLabel(provider)} endpoint or model was not found.`;
+  }
+  if (status === 429) {
+    return `${providerLabel(provider)} rate limit reached.`;
+  }
+  if (status >= 500) {
+    return `${providerLabel(provider)} returned a server error (${status}).`;
+  }
+  return `${providerLabel(provider)} request failed with HTTP ${status}.`;
+}
+
+function providerLabel(provider: AiProvider): string {
+  if (provider === "openai") return "OpenAI";
+  if (provider === "openrouter") return "OpenRouter";
+  return "Custom provider";
+}
+
+export async function testAiProviderConnection(config: AiProviderConfig): Promise<string> {
+  const result = await runAiRequest<{ ok?: boolean }>(config, {
+    systemPrompt: "You are a connectivity check. Return strict JSON only.",
+    userPrompt: JSON.stringify({
+      task: "Return {\"ok\": true} and nothing else."
+    }),
+    temperature: 0,
+    responseFormat: "json"
+  });
+  if (result.parsed && typeof result.parsed === "object" && "ok" in result.parsed) {
+    return `Connected to ${providerLabel(config.provider)} using ${config.model}.`;
+  }
+  return `Connected to ${providerLabel(config.provider)} using ${config.model}, but the response format was unusual.`;
 }
 
 export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSettingTab {
@@ -378,5 +425,30 @@ export class BaseSettingsTab<T extends BasePluginSettings> extends PluginSetting
             })
         );
     }
+
+    new Setting(containerEl)
+      .setName("Test AI connection")
+      .setDesc("Checks the currently selected provider, model, and key.")
+      .addButton((button) =>
+        button.setButtonText("Run test")
+          .onClick(async () => {
+            const config = getAiProviderConfig(this.plugin.settings);
+            if (!config) {
+              noticeError("AI is disabled or the selected provider is missing required credentials.");
+              return;
+            }
+            button.setDisabled(true);
+            button.setButtonText("Testing...");
+            try {
+              const message = await testAiProviderConnection(config);
+              noticeSuccess(message);
+            } catch (error) {
+              noticeError(`AI connection test failed: ${String(error)}`);
+            } finally {
+              button.setDisabled(false);
+              button.setButtonText("Run test");
+            }
+          })
+      );
   }
 }
