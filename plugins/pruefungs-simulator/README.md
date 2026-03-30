@@ -4,6 +4,15 @@ The simulator turns quiz notes into timed practice runs with stored results and 
 
 The current implementation focuses on multiple-choice questions because they can be scored reliably and reproduced in tests.
 
+```mermaid
+flowchart LR
+    Quiz["Quiz Note"] --> Parse["Question Parsing"]
+    Parse --> Session["Timed Session"]
+    Session --> Score["Automatic Scoring"]
+    Score --> Result["Result Note + Attempt Log"]
+    Result --> FollowUp["Weak Topic Follow-up"]
+```
+
 ## Use cases
 
 - AP1 or AP2-style self-tests from markdown files

@@ -4,6 +4,15 @@
 
 The plugin is intentionally file-based: plain markdown in, plain markdown out, and no hard dependency on `Dataview`.
 
+```mermaid
+flowchart LR
+    Notes["Learning Notes"] --> Scan["Vault Scan"]
+    Scan --> Metrics["Status + Review Metrics"]
+    Metrics --> Snapshot["Dashboard Snapshot"]
+    Snapshot --> Dataview["Dataview Views"]
+    Snapshot --> Kanban["Kanban / Review Workflow"]
+```
+
 ## What it does well
 
 - counts progress by `lernstatus` and `ausbildungsjahr`

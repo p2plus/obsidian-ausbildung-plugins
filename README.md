@@ -8,6 +8,26 @@ The repository bundles several standalone plugins that share a small common core
 
 This is a monorepo with several standalone Obsidian plugins. Each plugin can be built and released on its own, but they share a common data model and a small shared core.
 
+```mermaid
+flowchart LR
+    Vault["Obsidian Vault"] --> Notes["Markdown Notes + YAML"]
+    Notes --> Shared["packages/shared-core"]
+    Shared --> Dashboard["lernfortschritt-dashboard"]
+    Shared --> Exam["pruefungs-simulator"]
+    Shared --> Planner["lernplan-generator"]
+    Shared --> Review["spaced-repetition-engine"]
+    Shared --> Quiz["quiz-generator-markdown"]
+    Shared --> Analytics["ausbildungs-analytics-dashboard"]
+    Shared --> Keywords["ihk-keyword-tracker"]
+    Dashboard --> Outputs["Markdown Outputs"]
+    Exam --> Outputs
+    Planner --> Outputs
+    Review --> Outputs
+    Quiz --> Outputs
+    Analytics --> Outputs
+    Keywords --> Outputs
+```
+
 The repository includes:
 
 - plugin code
@@ -34,6 +54,18 @@ These plugins are designed to work alongside an existing Obsidian setup.
 - `Excalidraw` stays complementary. The plugins do not try to own diagramming or visual thinking.
 
 Optional integrations stay optional. The plugins start and run without hard dependencies on other community plugins.
+
+```mermaid
+flowchart TD
+    Frontmatter["YAML Front Matter"] --> Dataview["Dataview"]
+    Frontmatter --> Metadata["Metadata Menu"]
+    Outputs["Generated Markdown"] --> Kanban["Kanban"]
+    Outputs --> Periodic["Periodic Notes"]
+    Outputs --> Calendar["Calendar"]
+    Outputs --> Git["Obsidian Git"]
+    Templates["Templater + QuickAdd"] --> Frontmatter
+    Excalidraw["Excalidraw"] --> Outputs
+```
 
 ## Current plugins
 
