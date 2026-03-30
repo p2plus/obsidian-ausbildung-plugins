@@ -1,0 +1,10 @@
+{
+  "id": "lernplan-generator",
+  "name": "Lernplan Generator",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Creates reverse-planned study schedules from exam dates, weak topics, and available time.",
+  "author": "p2plus",
+  "isDesktopOnly": false
+}
+

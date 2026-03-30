@@ -1,0 +1,10 @@
+{
+  "id": "pruefungs-simulator",
+  "name": "Pruefungs Simulator",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Runs AP1/AP2-style quiz simulations with timing, scoring, and result logs.",
+  "author": "p2plus",
+  "isDesktopOnly": false
+}
+

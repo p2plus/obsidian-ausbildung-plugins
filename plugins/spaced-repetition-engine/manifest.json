@@ -1,0 +1,10 @@
+{
+  "id": "spaced-repetition-engine",
+  "name": "Spaced Repetition Engine",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Experimental review scheduling with Periodic Notes friendly output.",
+  "author": "p2plus",
+  "isDesktopOnly": false
+}
+

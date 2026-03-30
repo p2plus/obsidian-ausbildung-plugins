@@ -1,0 +1,27 @@
+{
+  "name": "obsidian-ausbildung-plugins",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Community-ready Obsidian plugins for vocational learning workflows.",
+  "workspaces": [
+    "packages/*",
+    "plugins/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspace @ausbildung/shared-core",
+    "lint": "tsc -p tsconfig.json --noEmit --pretty false",
+    "check": "npm run lint && npm run test && npm run build",
+    "dev:dashboard": "npm run dev --workspace lernfortschritt-dashboard",
+    "dev:exam": "npm run dev --workspace pruefungs-simulator",
+    "dev:planner": "npm run dev --workspace lernplan-generator"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "esbuild": "^0.25.9",
+    "obsidian": "^1.8.7",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "quiz-generator-markdown",
+  "name": "Quiz Generator aus Markdown",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Experimental quiz generation from markdown notes with simulator-compatible output.",
+  "author": "p2plus",
+  "isDesktopOnly": false
+}
+

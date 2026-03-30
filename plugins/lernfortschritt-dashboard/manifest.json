@@ -1,0 +1,10 @@
+{
+  "id": "lernfortschritt-dashboard",
+  "name": "Lernfortschritt Dashboard",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Tracks study progress, weak modules, and due reviews with Dataview-friendly output.",
+  "author": "p2plus",
+  "isDesktopOnly": false
+}
+

@@ -1,0 +1,10 @@
+{
+  "id": "ausbildungs-analytics-dashboard",
+  "name": "Ausbildungs Analytics Dashboard",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Experimental report generator for aggregated learning analytics.",
+  "author": "p2plus",
+  "isDesktopOnly": false
+}
+

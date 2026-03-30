@@ -1,0 +1,14 @@
+{
+  "name": "quiz-generator-markdown",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit && esbuild src/main.ts --bundle --outfile=main.js --format=cjs --target=es2020 --external:obsidian"
+  },
+  "dependencies": {
+    "@ausbildung/plugin-kit": "0.1.0",
+    "@ausbildung/shared-core": "0.1.0"
+  }
+}
+

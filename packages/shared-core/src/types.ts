@@ -1,0 +1,89 @@
+export type Lernstatus = "neu" | "gelesen" | "geuebt" | "sicher" | "beherrscht";
+export type Lerntyp = "theorie" | "uebung" | "quiz" | "pruefung" | "review";
+export type Pruefungsrelevanz = "niedrig" | "mittel" | "hoch" | "ihk-kritisch";
+
+export interface LearningNote {
+  path: string;
+  title: string;
+  folder: string;
+  status?: string;
+  ausbildungsjahr?: string;
+  lernstatus?: Lernstatus;
+  lerntyp?: Lerntyp;
+  modul_id?: string;
+  pruefungsrelevanz?: Pruefungsrelevanz;
+  last_review?: string;
+  next_review?: string;
+  difficulty?: number;
+  score_last?: number;
+  score_best?: number;
+  time_estimate_min?: number;
+  badge?: string;
+  tags?: string[];
+}
+
+export interface DashboardMetrics {
+  total: number;
+  byStatus: Record<string, number>;
+  byYear: Record<string, number>;
+  weakModules: Array<{ modulId: string; averageScore: number; count: number }>;
+  dueReviews: number;
+}
+
+export interface ExamQuestion {
+  id: string;
+  prompt: string;
+  options: string[];
+  correctIndexes: number[];
+  points: number;
+  type: "mc";
+}
+
+export interface ExamDefinition {
+  title: string;
+  pruefung: string;
+  zeitlimitMin: number;
+  punkteMax?: number;
+  modulId?: string;
+  questions: ExamQuestion[];
+}
+
+export interface ExamAttemptAnswer {
+  questionId: string;
+  selectedIndexes: number[];
+}
+
+export interface ExamAttemptResult {
+  score: number;
+  maxScore: number;
+  percentage: number;
+  weakTopics: string[];
+}
+
+export interface PlannerSettings {
+  examDate: string;
+  weeklyHours: number;
+  holidays?: string[];
+  vacationDays?: string[];
+  dailyMinutes?: number;
+}
+
+export interface PlannedTask {
+  date: string;
+  notePath: string;
+  modulId: string;
+  minutes: number;
+  reason: string;
+}
+
+export interface SpacedRepetitionResult {
+  nextReview: string;
+  intervalDays: number;
+}
+
+export interface KeywordCoverage {
+  keyword: string;
+  hits: number;
+  coveredPaths: string[];
+}
+
