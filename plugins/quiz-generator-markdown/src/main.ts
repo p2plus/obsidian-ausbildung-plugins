@@ -1,6 +1,6 @@
 import { Modal, Notice, Plugin, Setting } from "obsidian";
 import { buildQuizAiRequest, generateQuizFromMarkdown, normalizeQuizDraftQuestions, parseLearningNote, QuizDraftQuestion } from "@ausbildung/shared-core";
-import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, runAiRequest, writePluginOutput } from "@ausbildung/plugin-kit";
+import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface QuizSettings extends BasePluginSettings {
   outputFolder: string;
@@ -43,13 +43,14 @@ export default class QuizGeneratorMarkdownPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  private async generateFromCurrent(): Promise<void> {
+  async generateFromCurrent(): Promise<void> {
     const result = await this.buildQuizFromCurrent();
     const path = await writePluginOutput(this.app, this.settings.outputFolder, result.fileName, result.markdown);
-    new Notice(`Quiz erzeugt: ${path}`);
+    noticeSuccess(`Quiz erzeugt: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
 
-  private async buildQuizFromCurrent(): Promise<{ markdown: string; fileName: string }> {
+  async buildQuizFromCurrent(): Promise<{ markdown: string; fileName: string }> {
     const file = this.app.workspace.getActiveFile();
     if (!file) {
       new Notice("Keine aktive Notiz gefunden.");
@@ -177,13 +178,14 @@ class QuizPreviewModal extends Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: "Quiz Preview" });
     const preview = contentEl.createEl("pre");
+    preview.addClass("quiz-preview");
     preview.setText("Loading...");
     try {
-      const result = await this.plugin["buildQuizFromCurrent"]();
+      const result = await this.plugin.buildQuizFromCurrent();
       preview.setText(result.markdown);
       const button = contentEl.createEl("button", { text: `Quiz speichern als ${result.fileName}` });
       button.addEventListener("click", async () => {
-        await this.plugin["generateFromCurrent"]();
+        await this.plugin.generateFromCurrent();
         this.close();
       });
     } catch (error) {

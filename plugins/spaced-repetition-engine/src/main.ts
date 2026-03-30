@@ -1,6 +1,6 @@
 import { Modal, Notice, Plugin, Setting } from "obsidian";
 import { buildReviewPriorityAiRequest, calculateNextReview, normalizeReviewPriority } from "@ausbildung/shared-core";
-import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, runAiRequest, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
+import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
 
 type Rating = "vergessen" | "schwer" | "mittel" | "leicht";
 
@@ -59,13 +59,14 @@ export default class SpacedRepetitionEnginePlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  private async generateQueue(): Promise<void> {
+  async generateQueue(): Promise<void> {
     const { markdown, fileName } = await this.buildQueueMarkdown();
     const path = await writePluginOutput(this.app, this.settings.periodicNotesFolder, fileName, markdown);
-    new Notice(`Review Queue geschrieben: ${path}`);
+    noticeSuccess(`Review Queue geschrieben: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
 
-  private async buildQueueMarkdown(): Promise<{ markdown: string; fileName: string }> {
+  async buildQueueMarkdown(): Promise<{ markdown: string; fileName: string }> {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const today = new Date().toISOString().slice(0, 10);
     const due = scanned
@@ -167,13 +168,14 @@ class ReviewQueueModal extends Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: "Review Queue Preview" });
     const preview = contentEl.createEl("pre");
+    preview.addClass("sr-preview");
     preview.setText("Loading...");
     try {
-      const { markdown, fileName } = await this.plugin["buildQueueMarkdown"]();
+      const { markdown, fileName } = await this.plugin.buildQueueMarkdown();
       preview.setText(markdown);
       const button = contentEl.createEl("button", { text: `Queue speichern als ${fileName}` });
       button.addEventListener("click", async () => {
-        await this.plugin["generateQueue"]();
+        await this.plugin.generateQueue();
         this.close();
       });
     } catch (error) {

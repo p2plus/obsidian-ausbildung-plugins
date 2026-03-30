@@ -246,6 +246,14 @@ async function writePluginOutput(app, folderPath, fileName, content) {
   }
   return path;
 }
+async function openOutputFile(app, path, newLeaf = false) {
+  const file = app.vault.getAbstractFileByPath(path);
+  if (!(file instanceof import_obsidian.TFile)) {
+    return;
+  }
+  const leaf = app.workspace.getLeaf(newLeaf);
+  await leaf.openFile(file);
+}
 function noticeSuccess(message) {
   new import_obsidian.Notice(message, 4e3);
 }
@@ -551,7 +559,8 @@ var QuizGeneratorMarkdownPlugin = class extends import_obsidian2.Plugin {
   async generateFromCurrent() {
     const result = await this.buildQuizFromCurrent();
     const path = await writePluginOutput(this.app, this.settings.outputFolder, result.fileName, result.markdown);
-    new import_obsidian2.Notice(`Quiz erzeugt: ${path}`);
+    noticeSuccess(`Quiz erzeugt: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
   async buildQuizFromCurrent() {
     const file = this.app.workspace.getActiveFile();
@@ -658,13 +667,14 @@ var QuizPreviewModal = class extends import_obsidian2.Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: "Quiz Preview" });
     const preview = contentEl.createEl("pre");
+    preview.addClass("quiz-preview");
     preview.setText("Loading...");
     try {
-      const result = await this.plugin["buildQuizFromCurrent"]();
+      const result = await this.plugin.buildQuizFromCurrent();
       preview.setText(result.markdown);
       const button = contentEl.createEl("button", { text: `Quiz speichern als ${result.fileName}` });
       button.addEventListener("click", async () => {
-        await this.plugin["generateFromCurrent"]();
+        await this.plugin.generateFromCurrent();
         this.close();
       });
     } catch (error) {

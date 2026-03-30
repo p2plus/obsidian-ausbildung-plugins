@@ -1,6 +1,6 @@
 import { Modal, Notice, Plugin } from "obsidian";
 import { buildAnalyticsAiRequest, buildAnalyticsReport, calculateDashboardMetrics, normalizeAnalyticsInsight } from "@ausbildung/shared-core";
-import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
+import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
 
 export default class AusbildungsAnalyticsDashboardPlugin extends Plugin {
   settings!: BasePluginSettings;
@@ -28,13 +28,14 @@ export default class AusbildungsAnalyticsDashboardPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  private async generateReport(): Promise<void> {
+  async generateReport(): Promise<void> {
     const result = await this.buildReport();
     const path = await writePluginOutput(this.app, this.settings.dashboardFolder, "analytics-report.md", result);
-    new Notice(`Analytics-Report geschrieben: ${path}`);
+    noticeSuccess(`Analytics-Report geschrieben: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
 
-  private async buildReport(): Promise<string> {
+  async buildReport(): Promise<string> {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const notes = scanned.map((entry) => entry.note);
     const metrics = calculateDashboardMetrics(notes);
@@ -94,13 +95,14 @@ class AnalyticsPreviewModal extends Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: "Analytics Preview" });
     const preview = contentEl.createEl("pre");
+    preview.addClass("analytics-preview");
     preview.setText("Loading...");
     try {
-      const markdown = await this.plugin["buildReport"]();
+      const markdown = await this.plugin.buildReport();
       preview.setText(markdown);
       const button = contentEl.createEl("button", { text: "Analytics speichern" });
       button.addEventListener("click", async () => {
-        await this.plugin["generateReport"]();
+        await this.plugin.generateReport();
         this.close();
       });
     } catch (error) {

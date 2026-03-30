@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
+import { App, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf } from "obsidian";
 import { AiGenerationRequest, AiGenerationResult, AiProvider, AiProviderConfig, LearningNote, parseLearningNote, safeJsonParseWithRepair, updateYamlField } from "@ausbildung/shared-core";
 
 export interface BasePluginSettings {
@@ -76,6 +76,15 @@ export async function writePluginOutput(app: App, folderPath: string, fileName: 
     await app.vault.create(path, content);
   }
   return path;
+}
+
+export async function openOutputFile(app: App, path: string, newLeaf = false): Promise<void> {
+  const file = app.vault.getAbstractFileByPath(path);
+  if (!(file instanceof TFile)) {
+    return;
+  }
+  const leaf = app.workspace.getLeaf(newLeaf) as WorkspaceLeaf;
+  await leaf.openFile(file);
 }
 
 export async function updateLearningStatus(app: App, file: TFile, status: string): Promise<void> {

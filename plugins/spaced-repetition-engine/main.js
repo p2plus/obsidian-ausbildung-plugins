@@ -262,6 +262,14 @@ async function writePluginOutput(app, folderPath, fileName, content) {
   }
   return path;
 }
+async function openOutputFile(app, path, newLeaf = false) {
+  const file = app.vault.getAbstractFileByPath(path);
+  if (!(file instanceof import_obsidian.TFile)) {
+    return;
+  }
+  const leaf = app.workspace.getLeaf(newLeaf);
+  await leaf.openFile(file);
+}
 async function updateLearningStatus(app, file, status) {
   const markdown = await app.vault.cachedRead(file);
   const updated = updateYamlField(markdown, "lernstatus", status);
@@ -589,7 +597,8 @@ var SpacedRepetitionEnginePlugin = class extends import_obsidian2.Plugin {
   async generateQueue() {
     const { markdown, fileName } = await this.buildQueueMarkdown();
     const path = await writePluginOutput(this.app, this.settings.periodicNotesFolder, fileName, markdown);
-    new import_obsidian2.Notice(`Review Queue geschrieben: ${path}`);
+    noticeSuccess(`Review Queue geschrieben: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
   async buildQueueMarkdown() {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
@@ -683,13 +692,14 @@ var ReviewQueueModal = class extends import_obsidian2.Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: "Review Queue Preview" });
     const preview = contentEl.createEl("pre");
+    preview.addClass("sr-preview");
     preview.setText("Loading...");
     try {
-      const { markdown, fileName } = await this.plugin["buildQueueMarkdown"]();
+      const { markdown, fileName } = await this.plugin.buildQueueMarkdown();
       preview.setText(markdown);
       const button = contentEl.createEl("button", { text: `Queue speichern als ${fileName}` });
       button.addEventListener("click", async () => {
-        await this.plugin["generateQueue"]();
+        await this.plugin.generateQueue();
         this.close();
       });
     } catch (error) {

@@ -264,6 +264,14 @@ async function writePluginOutput(app, folderPath, fileName, content) {
   }
   return path;
 }
+async function openOutputFile(app, path, newLeaf = false) {
+  const file = app.vault.getAbstractFileByPath(path);
+  if (!(file instanceof import_obsidian.TFile)) {
+    return;
+  }
+  const leaf = app.workspace.getLeaf(newLeaf);
+  await leaf.openFile(file);
+}
 function noticeSuccess(message) {
   new import_obsidian.Notice(message, 4e3);
 }
@@ -562,7 +570,8 @@ var AusbildungsAnalyticsDashboardPlugin = class extends import_obsidian2.Plugin 
   async generateReport() {
     const result = await this.buildReport();
     const path = await writePluginOutput(this.app, this.settings.dashboardFolder, "analytics-report.md", result);
-    new import_obsidian2.Notice(`Analytics-Report geschrieben: ${path}`);
+    noticeSuccess(`Analytics-Report geschrieben: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
   async buildReport() {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
@@ -621,13 +630,14 @@ var AnalyticsPreviewModal = class extends import_obsidian2.Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: "Analytics Preview" });
     const preview = contentEl.createEl("pre");
+    preview.addClass("analytics-preview");
     preview.setText("Loading...");
     try {
-      const markdown = await this.plugin["buildReport"]();
+      const markdown = await this.plugin.buildReport();
       preview.setText(markdown);
       const button = contentEl.createEl("button", { text: "Analytics speichern" });
       button.addEventListener("click", async () => {
-        await this.plugin["generateReport"]();
+        await this.plugin.generateReport();
         this.close();
       });
     } catch (error) {

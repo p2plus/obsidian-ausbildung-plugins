@@ -1,6 +1,6 @@
 import { Modal, Plugin, Setting } from "obsidian";
 import { buildKeywordGapAiRequest, computeKeywordCoverage, normalizeKeywordGaps } from "@ausbildung/shared-core";
-import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
+import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface KeywordSettings extends BasePluginSettings {
   keywords: string[];
@@ -80,12 +80,14 @@ export default class KeywordTrackerPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  private async generateReport(): Promise<void> {
+  async generateReport(): Promise<void> {
     const markdown = await this.buildReport();
-    await writePluginOutput(this.app, this.settings.dashboardFolder, "keyword-coverage.md", markdown);
+    const path = await writePluginOutput(this.app, this.settings.dashboardFolder, "keyword-coverage.md", markdown);
+    noticeSuccess(`Keyword-Bericht geschrieben: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
 
-  private async buildReport(): Promise<string> {
+  async buildReport(): Promise<string> {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const expandedKeywords = this.expandKeywords();
     const coverage = computeKeywordCoverage(scanned, expandedKeywords);
@@ -153,13 +155,14 @@ class KeywordPreviewModal extends Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: "Keyword Coverage Preview" });
     const preview = contentEl.createEl("pre");
+    preview.addClass("keyword-preview");
     preview.setText("Loading...");
     try {
-      const markdown = await this.plugin["buildReport"]();
+      const markdown = await this.plugin.buildReport();
       preview.setText(markdown);
       const button = contentEl.createEl("button", { text: "Bericht speichern" });
       button.addEventListener("click", async () => {
-        await this.plugin["generateReport"]();
+        await this.plugin.generateReport();
         this.close();
       });
     } catch (error) {
