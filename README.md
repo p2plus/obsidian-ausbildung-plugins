@@ -54,16 +54,6 @@ All plugins in the repo work against the same file-based learning model:
 - generated markdown outputs instead of hidden proprietary storage
 - optional AI features through BYOK provider settings
 
-The current BYOK layer supports:
-
-- OpenAI
-- OpenRouter
-- Anthropic
-- Google
-- Z.AI
-- MiniMax
-- Moonshot
-- custom OpenAI-compatible endpoints
 
 Each plugin keeps a local fallback path. If AI is disabled, a key is missing, or a provider request fails, the plugin should still remain usable.
 
