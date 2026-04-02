@@ -12,6 +12,7 @@
     "test": "npm run test --workspace @ausbildung/shared-core",
     "lint": "tsc -p tsconfig.json --noEmit --pretty false",
     "check": "npm run lint && npm run test && npm run build",
+    "bootstrap:vault": "python3 scripts/bootstrap_vault.py --help",
     "dev:dashboard": "npm run dev --workspace lernfortschritt-dashboard",
     "dev:exam": "npm run dev --workspace pruefungs-simulator",
     "dev:planner": "npm run dev --workspace lernplan-generator"

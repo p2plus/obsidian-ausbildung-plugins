@@ -832,19 +832,25 @@ var QuizPreviewModal = class extends import_obsidian2.Modal {
     const shell = contentEl.createDiv({ cls: "ausbildung-modal quiz-modal" });
     const hero = shell.createDiv({ cls: "ausbildung-modal__hero" });
     hero.createDiv({ cls: "ausbildung-modal__eyebrow", text: "Quiz generation" });
-    hero.createEl("h2", { cls: "ausbildung-modal__title", text: "Quiz Preview" });
+    hero.createEl("h2", { cls: "ausbildung-modal__title", text: "Quiz Preview & Editor" });
     hero.createEl("p", {
       cls: "ausbildung-modal__subtitle",
-      text: "Voransicht des Quiz-Sets fuer die aktuell geoeffnete Notiz."
+      text: "Voransicht des Quiz-Sets. Bearbeite Fragen vor dem Speichern."
     });
     const stats = shell.createDiv({ cls: "ausbildung-modal__stats" });
     const questionStat = createStatCard(stats, "Questions", "...");
     createStatCard(stats, "Mode", this.plugin.settings.generationMode === "ai-enhanced" ? "AI-enhanced" : "Rule-based");
     createStatCard(stats, "Exam level", this.plugin.settings.examLevel);
+    const tabs = shell.createDiv({ cls: "ausbildung-modal__tabs" });
+    const previewTab = tabs.createEl("button", { cls: "ausbildung-tab active", text: "Preview" });
+    const editTab = tabs.createEl("button", { cls: "ausbildung-tab", text: "Edit" });
+    const exportTab = tabs.createEl("button", { cls: "ausbildung-tab", text: "Export" });
     const body = shell.createDiv({ cls: "ausbildung-modal__body" });
     const summary = body.createDiv({ cls: "ausbildung-modal__summary" });
-    const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
-    preview.setText("Loading...");
+    const previewContainer = body.createDiv({ cls: "ausbildung-modal__rendered" });
+    const editContainer = body.createDiv({ cls: "ausbildung-modal__editor ausbildung-hidden" });
+    const exportContainer = body.createDiv({ cls: "ausbildung-modal__export ausbildung-hidden" });
+    previewContainer.setText("Loading...");
     const actions = shell.createDiv({ cls: "ausbildung-modal__actions" });
     const saveButton = actions.createEl("button", { cls: "mod-cta", text: "Save quiz" });
     saveButton.disabled = true;
@@ -852,22 +858,119 @@ var QuizPreviewModal = class extends import_obsidian2.Modal {
     closeButton.addEventListener("click", () => this.close());
     try {
       const result = await this.plugin.buildQuizFromCurrent();
-      questionStat.setText(String((result.markdown.match(/^## Frage /gm) ?? []).length));
+      const questionCount = (result.markdown.match(/^## Frage /gm) ?? []).length;
+      questionStat.setText(String(questionCount));
       summary.empty();
       summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Output: ${this.plugin.settings.outputFolder}/${result.fileName}` });
       summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Target level: ${this.plugin.settings.examLevel}` });
-      preview.empty();
-      await import_obsidian2.MarkdownRenderer.render(this.app, result.markdown, preview, "", this.plugin);
+      this.renderPreview(previewContainer, result.markdown);
+      this.renderEdit(editContainer, result.markdown);
+      this.renderExport(exportContainer, () => this.getEditedMarkdown(editContainer, result.markdown), result.fileName);
       saveButton.setText(`Save as ${result.fileName}`);
       saveButton.disabled = false;
       saveButton.addEventListener("click", async () => {
-        await this.plugin.generateFromCurrent();
+        const finalMarkdown = this.getEditedMarkdown(editContainer, result.markdown);
+        const path = await writePluginOutput(this.app, this.plugin.settings.outputFolder, result.fileName, finalMarkdown);
+        noticeSuccess(`Quiz erzeugt: ${path}`);
+        await openOutputFile(this.app, path, true);
         this.close();
       });
+      previewTab.addEventListener("click", () => this.switchTab(
+        previewTab,
+        [editTab, exportTab],
+        previewContainer,
+        [editContainer, exportContainer]
+      ));
+      editTab.addEventListener("click", () => this.switchTab(
+        editTab,
+        [previewTab, exportTab],
+        editContainer,
+        [previewContainer, exportContainer]
+      ));
+      exportTab.addEventListener("click", () => this.switchTab(
+        exportTab,
+        [previewTab, editTab],
+        exportContainer,
+        [previewContainer, editContainer]
+      ));
     } catch (error) {
-      preview.empty();
-      preview.createDiv({ cls: "ausbildung-modal__error", text: String(error) });
+      previewContainer.empty();
+      previewContainer.createDiv({ cls: "ausbildung-modal__error", text: String(error) });
     }
+  }
+  async renderPreview(container, markdown) {
+    container.empty();
+    await import_obsidian2.MarkdownRenderer.render(this.app, markdown, container, "", this.plugin);
+  }
+  renderEdit(container, markdown) {
+    container.empty();
+    const textarea = container.createEl("textarea", { cls: "ausbildung-editor", text: markdown });
+    textarea.style.width = "100%";
+    textarea.style.height = "400px";
+    textarea.style.resize = "vertical";
+  }
+  renderExport(container, getMarkdown, fileName) {
+    container.empty();
+    const formats = ["Markdown", "JSON", "CSV"];
+    formats.forEach((format) => {
+      const button = container.createEl("button", { cls: "mod-cta", text: `Export as ${format}` });
+      button.addEventListener("click", () => this.exportQuiz(getMarkdown(), fileName, format.toLowerCase()));
+    });
+  }
+  switchTab(activeTab, inactiveTabs, activeContainer, inactiveContainers) {
+    activeTab.addClass("active");
+    inactiveTabs.forEach((tab) => tab.removeClass("active"));
+    activeContainer.removeClass("ausbildung-hidden");
+    inactiveContainers.forEach((container) => container.addClass("ausbildung-hidden"));
+  }
+  getEditedMarkdown(editContainer, original) {
+    const textarea = editContainer.querySelector("textarea");
+    return textarea ? textarea.value : original;
+  }
+  async exportQuiz(markdown, fileName, format) {
+    let content = markdown;
+    let ext = "md";
+    if (format === "json") {
+      const questions = this.parseQuestions(markdown);
+      content = JSON.stringify({ fileName, questions }, null, 2);
+      ext = "json";
+    } else if (format === "csv") {
+      const questions = this.parseQuestions(markdown);
+      content = "Question,Options,Correct,Explanation\n" + questions.map((q) => `"${q.question}","${q.options.join(";")}","${q.correct}","${q.explanation}"`).join("\n");
+      ext = "csv";
+    }
+    const exportFileName = `${fileName.replace(".md", "")}.${ext}`;
+    const path = await writePluginOutput(this.app, this.plugin.settings.outputFolder, exportFileName, content);
+    noticeSuccess(`Exported to ${path}`);
+  }
+  parseQuestions(markdown) {
+    const lines = markdown.split("\n");
+    const questions = [];
+    let currentQuestion = null;
+    for (const line of lines) {
+      if (line.startsWith("## Frage")) {
+        if (currentQuestion) questions.push(currentQuestion);
+        currentQuestion = { question: "", options: [], correct: "", explanation: "" };
+      } else if (line.startsWith("FRAGE:")) {
+        if (!currentQuestion) {
+          continue;
+        }
+        currentQuestion.question = line.replace("FRAGE:", "").trim();
+      } else if (line.startsWith("- [")) {
+        if (!currentQuestion) {
+          continue;
+        }
+        currentQuestion.options.push(line.replace(/^- \[.\] /, "").trim());
+        if (line.includes("[x]")) currentQuestion.correct = line.replace(/^- \[.\] /, "").trim();
+      } else if (line.startsWith("ERKLAERUNG:")) {
+        if (!currentQuestion) {
+          continue;
+        }
+        currentQuestion.explanation = line.replace("ERKLAERUNG:", "").trim();
+      }
+    }
+    if (currentQuestion) questions.push(currentQuestion);
+    return questions;
   }
 };
 function createStatCard(container, label, value) {

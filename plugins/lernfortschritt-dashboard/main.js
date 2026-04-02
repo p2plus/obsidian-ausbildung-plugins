@@ -721,6 +721,11 @@ var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
       name: "Dashboard: Aktuelle Notiz als beherrscht markieren",
       callback: () => void this.markCurrent("beherrscht")
     });
+    this.addCommand({
+      id: "open-live-dashboard",
+      name: "Dashboard: Live-Ansicht \xF6ffnen",
+      callback: () => void this.openLiveDashboard()
+    });
     this.addSettingTab(new BaseSettingsTab(this.app, this));
   }
   async loadSettings() {
@@ -746,5 +751,100 @@ var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
     }
     await updateLearningStatus(this.app, file, status);
     noticeSuccess(`lernstatus auf ${status} gesetzt.`);
+  }
+  openLiveDashboard() {
+    new LiveDashboardModal(this.app, this).open();
+  }
+};
+var LiveDashboardModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  async onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    const shell = contentEl.createDiv({ cls: "live-dashboard-modal" });
+    const header = shell.createDiv({ cls: "dashboard-header" });
+    header.createEl("h2", { text: "Live Lernfortschritt Dashboard" });
+    const filters = shell.createDiv({ cls: "dashboard-filters" });
+    const yearFilter = filters.createEl("select", { cls: "dashboard-filter" });
+    yearFilter.createEl("option", { value: "all", text: "Alle Jahre" });
+    const charts = shell.createDiv({ cls: "dashboard-charts" });
+    await this.loadMetrics();
+    this.renderFilters(yearFilter);
+    this.renderCharts(charts, yearFilter.value);
+    yearFilter.addEventListener("change", () => this.renderCharts(charts, yearFilter.value));
+    const actions = shell.createDiv({ cls: "dashboard-actions" });
+    const snapshotBtn = actions.createEl("button", { cls: "mod-cta", text: "Snapshot erstellen" });
+    const closeBtn = actions.createEl("button", { text: "Schlie\xDFen" });
+    snapshotBtn.addEventListener("click", async () => {
+      await this.plugin.generateSnapshot();
+      this.close();
+    });
+    closeBtn.addEventListener("click", () => this.close());
+  }
+  async loadMetrics() {
+    const scanned = await scanVault(this.app, this.plugin.settings.rootFolders);
+    this.metrics = calculateDashboardMetrics(scanned.map((entry) => entry.note));
+  }
+  renderFilters(yearFilter) {
+    Object.keys(this.metrics.byYear).forEach((year) => {
+      yearFilter.createEl("option", { value: year, text: year });
+    });
+  }
+  renderCharts(container, yearFilter) {
+    container.empty();
+    const statusChart = container.createDiv({ cls: "chart-card" });
+    statusChart.createEl("h3", { text: "Lernstatus" });
+    const statusData = yearFilter === "all" ? this.metrics.byStatus : this.filterByYear(this.metrics.byYear, yearFilter).byStatus;
+    this.renderPieChart(statusChart, statusData);
+    const progressCard = container.createDiv({ cls: "chart-card" });
+    progressCard.createEl("h3", { text: "Gesamtfortschritt" });
+    const mastered = this.metrics.byStatus.beherrscht || 0;
+    const total = this.metrics.total;
+    this.renderProgressBar(progressCard, mastered, total);
+    const modulesCard = container.createDiv({ cls: "chart-card" });
+    modulesCard.createEl("h3", { text: "Schw\xE4chste Module" });
+    this.metrics.weakModules.slice(0, 3).forEach((module2) => {
+      const item = modulesCard.createDiv({ cls: "module-item" });
+      item.createSpan({ text: `${module2.modulId}: ${module2.averageScore}%` });
+      this.renderMiniProgressBar(item, module2.averageScore);
+    });
+    if (mastered >= total * 0.5) {
+      const celebration = container.createDiv({ cls: "celebration" });
+      celebration.createEl("p", { text: "\u{1F389} \xDCber 50% der Notizen beherrscht! Gut gemacht!" });
+    }
+  }
+  filterByYear(byYear, year) {
+    return this.metrics;
+  }
+  renderPieChart(container, data) {
+    const canvas = container.createEl("div", { cls: "pie-chart" });
+    const total = Object.values(data).reduce((sum, val) => sum + val, 0);
+    let cumulative = 0;
+    const colors = ["#2f7d61", "#d97706", "#7d5a2f", "#b24a3f"];
+    let colorIndex = 0;
+    Object.entries(data).forEach(([label, value]) => {
+      const percentage = value / total * 100;
+      const segment = canvas.createDiv({ cls: "pie-segment" });
+      segment.style.background = colors[colorIndex % colors.length];
+      segment.style.transform = `rotate(${cumulative}deg)`;
+      segment.style.clipPath = `polygon(0 0, 50% 0, 50% 100%, 0 100%)`;
+      const labelDiv = canvas.createDiv({ cls: "pie-label", text: `${label}: ${value}` });
+      cumulative += percentage * 3.6;
+      colorIndex++;
+    });
+  }
+  renderProgressBar(container, current, total) {
+    const bar = container.createDiv({ cls: "progress-bar" });
+    const fill = bar.createDiv({ cls: "progress-fill" });
+    fill.style.width = `${current / total * 100}%`;
+    container.createEl("p", { text: `${current}/${total} beherrscht` });
+  }
+  renderMiniProgressBar(container, percentage) {
+    const bar = container.createDiv({ cls: "mini-progress-bar" });
+    const fill = bar.createDiv({ cls: "mini-progress-fill" });
+    fill.style.width = `${percentage}%`;
   }
 };

@@ -96,6 +96,51 @@
   gap: 0.75rem;
 }
 
+.ausbildung-modal__tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.ausbildung-tab {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.ausbildung-tab.active {
+  background: var(--ausbildung-accent);
+  color: white;
+}
+
+.ausbildung-modal__editor {
+  padding: 1.15rem;
+}
+
+.ausbildung-editor {
+  width: 100%;
+  height: 400px;
+  resize: vertical;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  padding: 0.5rem;
+}
+
+.ausbildung-modal__export {
+  padding: 1.15rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.ausbildung-hidden {
+  display: none;
+}
+
 .ausbildung-modal__error,
 .ausbildung-settings-intro {
   padding: 0.9rem 1rem;

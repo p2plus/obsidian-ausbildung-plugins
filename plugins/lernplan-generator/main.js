@@ -25,6 +25,31 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var import_obsidian2 = require("obsidian");
 
+// ../../packages/shared-core/src/ai.ts
+function extractJsonObject(rawText) {
+  const start = rawText.indexOf("{");
+  const end = rawText.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    return null;
+  }
+  return rawText.slice(start, end + 1);
+}
+function safeJsonParseWithRepair(rawText) {
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    const extracted = extractJsonObject(rawText);
+    if (!extracted) {
+      return void 0;
+    }
+    try {
+      return JSON.parse(extracted);
+    } catch {
+      return void 0;
+    }
+  }
+}
+
 // ../../packages/shared-core/src/notes.ts
 var FRONTMATTER_DELIMITER = "---";
 function parseScalarValue(raw) {
@@ -216,6 +241,176 @@ async function writePluginOutput(app, folderPath, fileName, content) {
 function noticeSuccess(message) {
   new import_obsidian.Notice(message, 4e3);
 }
+function getAiProviderConfig(settings) {
+  if (!settings.aiEnabled) {
+    return null;
+  }
+  if (settings.aiProvider === "openai" && settings.openAiApiKey.trim()) {
+    return {
+      provider: "openai",
+      apiKey: settings.openAiApiKey.trim(),
+      model: settings.openAiModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "openrouter" && settings.openRouterApiKey.trim()) {
+    return {
+      provider: "openrouter",
+      apiKey: settings.openRouterApiKey.trim(),
+      model: settings.openRouterModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "anthropic" && settings.anthropicApiKey.trim()) {
+    return {
+      provider: "anthropic",
+      apiKey: settings.anthropicApiKey.trim(),
+      model: settings.anthropicModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "google" && settings.googleApiKey.trim()) {
+    return {
+      provider: "google",
+      apiKey: settings.googleApiKey.trim(),
+      model: settings.googleModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "zai" && settings.zaiApiKey.trim()) {
+    return {
+      provider: "zai",
+      apiKey: settings.zaiApiKey.trim(),
+      model: settings.zaiModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "minimax" && settings.minimaxApiKey.trim()) {
+    return {
+      provider: "minimax",
+      apiKey: settings.minimaxApiKey.trim(),
+      model: settings.minimaxModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "moonshot" && settings.moonshotApiKey.trim()) {
+    return {
+      provider: "moonshot",
+      apiKey: settings.moonshotApiKey.trim(),
+      model: settings.moonshotModel.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  if (settings.aiProvider === "custom" && settings.customApiKey.trim() && settings.customEndpoint.trim()) {
+    return {
+      provider: "custom",
+      apiKey: settings.customApiKey.trim(),
+      model: settings.customModel.trim(),
+      endpoint: settings.customEndpoint.trim(),
+      timeoutMs: settings.requestTimeoutMs
+    };
+  }
+  return null;
+}
+function getProviderEndpoint(config) {
+  if (config.provider === "openai") {
+    return "https://api.openai.com/v1/chat/completions";
+  }
+  if (config.provider === "openrouter") {
+    return "https://openrouter.ai/api/v1/chat/completions";
+  }
+  if (config.provider === "anthropic") {
+    return "https://api.anthropic.com/v1/chat/completions";
+  }
+  if (config.provider === "google") {
+    return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+  }
+  if (config.provider === "zai") {
+    return "https://api.z.ai/api/paas/v4/chat/completions";
+  }
+  if (config.provider === "minimax") {
+    return "https://api.minimax.io/v1/chat/completions";
+  }
+  if (config.provider === "moonshot") {
+    return "https://api.moonshot.ai/v1/chat/completions";
+  }
+  return config.endpoint ?? "https://api.openai.com/v1/chat/completions";
+}
+async function runAiRequest(config, request) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs ?? 45e3);
+  try {
+    const body = {
+      model: config.model,
+      temperature: request.temperature ?? 0.2,
+      messages: [
+        { role: "system", content: request.systemPrompt },
+        { role: "user", content: request.userPrompt }
+      ]
+    };
+    if (request.responseFormat === "json") {
+      body.response_format = { type: "json_object" };
+    }
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`
+    };
+    if (config.provider === "openrouter") {
+      headers["HTTP-Referer"] = "https://github.com/p2plus/obsidian-ausbildung-plugins";
+      headers["X-Title"] = "Obsidian Ausbildung Plugins";
+    }
+    const response = await fetch(getProviderEndpoint(config), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      const message = typeof payload.error === "object" && payload.error && "message" in payload.error ? String(payload.error.message) : providerErrorMessage(config.provider, response.status);
+      throw new Error(message);
+    }
+    const content = payload.choices?.[0]?.message?.content;
+    const rawText = typeof content === "string" ? content : "";
+    const parsed = request.responseFormat === "json" ? safeJsonParseWithRepair(rawText) : void 0;
+    return {
+      provider: config.provider,
+      model: config.model,
+      rawText,
+      parsed
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+function providerErrorMessage(provider, status) {
+  if (status === 401) {
+    return `${providerLabel(provider)} rejected the API key.`;
+  }
+  if (status === 403) {
+    return `${providerLabel(provider)} refused the request. Check account access or model permissions.`;
+  }
+  if (status === 404) {
+    return `${providerLabel(provider)} endpoint or model was not found.`;
+  }
+  if (status === 429) {
+    return `${providerLabel(provider)} rate limit reached.`;
+  }
+  if (status >= 500) {
+    return `${providerLabel(provider)} returned a server error (${status}).`;
+  }
+  return `${providerLabel(provider)} request failed with HTTP ${status}.`;
+}
+function providerLabel(provider) {
+  if (provider === "openai") return "OpenAI";
+  if (provider === "openrouter") return "OpenRouter";
+  if (provider === "anthropic") return "Anthropic";
+  if (provider === "google") return "Google";
+  if (provider === "zai") return "Z.AI";
+  if (provider === "minimax") return "MiniMax";
+  if (provider === "moonshot") return "Moonshot";
+  return "Custom provider";
+}
 
 // src/main.ts
 var DEFAULT_SETTINGS = {
@@ -275,6 +470,11 @@ var LernplanGeneratorPlugin = class extends import_obsidian2.Plugin {
       name: "Lernplan: Heute in Periodic Notes schreiben",
       callback: () => void this.writeDailyPlan()
     });
+    this.addCommand({
+      id: "preview-study-plan",
+      name: "Lernplan: Interaktive Vorschau",
+      callback: () => void this.openPlanPreview()
+    });
     this.addSettingTab(new LernplanSettingsTab(this.app, this));
   }
   async loadSettings() {
@@ -294,7 +494,25 @@ var LernplanGeneratorPlugin = class extends import_obsidian2.Plugin {
         vacationDays: this.settings.vacationDays
       }
     );
-    return renderStudyPlanMarkdown(tasks);
+    let markdown = renderStudyPlanMarkdown(tasks);
+    const provider = getAiProviderConfig(this.settings);
+    if (provider) {
+      try {
+        const aiResponse = await runAiRequest(provider, {
+          systemPrompt: "Du bist ein Lernplan-Optimierer. Gib kurze, hilfreiche Verbesserungsvorschl\xE4ge f\xFCr den Lernplan.",
+          userPrompt: `Analysiere diesen Lernplan und gib 2-3 konkrete Verbesserungsvorschl\xE4ge:
+
+${markdown.slice(0, 2e3)}`,
+          temperature: 0.3
+        });
+        markdown += `
+
+## AI-Vorschl\xE4ge
+${aiResponse.rawText}`;
+      } catch (error) {
+      }
+    }
+    return markdown;
   }
   async generatePlan() {
     const markdown = await this.buildPlanMarkdown();
@@ -306,5 +524,107 @@ var LernplanGeneratorPlugin = class extends import_obsidian2.Plugin {
     const fileName = `${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}-study-plan.md`;
     const path = await writePluginOutput(this.app, this.settings.periodicNotesFolder, fileName, markdown);
     noticeSuccess(`Tagesplan geschrieben: ${path}`);
+  }
+  openPlanPreview() {
+    new PlanPreviewModal(this.app, this).open();
+  }
+};
+var PlanPreviewModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.tasks = [];
+    this.plugin = plugin;
+    this.currentMonth = /* @__PURE__ */ new Date();
+  }
+  async onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    const shell = contentEl.createDiv({ cls: "plan-preview-modal" });
+    const header = shell.createDiv({ cls: "plan-header" });
+    header.createEl("h2", { text: "Lernplan Vorschau" });
+    const nav = header.createDiv({ cls: "plan-nav" });
+    const prevBtn = nav.createEl("button", { text: "\u25C0" });
+    const monthDisplay = nav.createEl("span", { text: this.currentMonth.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) });
+    const nextBtn = nav.createEl("button", { text: "\u25B6" });
+    const calendar = shell.createDiv({ cls: "plan-calendar" });
+    this.renderCalendar(calendar);
+    const actions = shell.createDiv({ cls: "plan-actions" });
+    const generateBtn = actions.createEl("button", { cls: "mod-cta", text: "Plan generieren" });
+    const closeBtn = actions.createEl("button", { text: "Schlie\xDFen" });
+    try {
+      const markdown = await this.plugin.buildPlanMarkdown();
+      this.tasks = this.parseTasks(markdown);
+      this.renderCalendar(calendar);
+      generateBtn.addEventListener("click", async () => {
+        await this.plugin.generatePlan();
+        this.close();
+      });
+    } catch (error) {
+      calendar.setText(`Fehler: ${String(error)}`);
+    }
+    prevBtn.addEventListener("click", () => {
+      this.currentMonth.setMonth(this.currentMonth.getMonth() - 1);
+      monthDisplay.setText(this.currentMonth.toLocaleDateString("de-DE", { month: "long", year: "numeric" }));
+      this.renderCalendar(calendar);
+    });
+    nextBtn.addEventListener("click", () => {
+      this.currentMonth.setMonth(this.currentMonth.getMonth() + 1);
+      monthDisplay.setText(this.currentMonth.toLocaleDateString("de-DE", { month: "long", year: "numeric" }));
+      this.renderCalendar(calendar);
+    });
+    closeBtn.addEventListener("click", () => this.close());
+  }
+  parseTasks(markdown) {
+    const lines = markdown.split("\n");
+    const tasks = [];
+    let currentTask = null;
+    for (const line of lines) {
+      if (line.startsWith("## ")) {
+        if (currentTask && currentTask.date) {
+          tasks.push(currentTask);
+        }
+        const dateMatch = line.match(/## (\d{4}-\d{2}-\d{2})/);
+        currentTask = dateMatch ? { date: dateMatch[1], topics: [], hours: 0, focus: "" } : null;
+      } else if (currentTask && line.startsWith("- ")) {
+        const topicMatch = line.match(/- (.+)/);
+        if (topicMatch) {
+          currentTask.topics.push(topicMatch[1]);
+        }
+      }
+    }
+    if (currentTask && currentTask.date) {
+      tasks.push(currentTask);
+    }
+    return tasks;
+  }
+  renderCalendar(container) {
+    container.empty();
+    const year = this.currentMonth.getFullYear();
+    const month = this.currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = new Date(firstDay);
+    startDate.setDate(firstDay.getDate() - firstDay.getDay());
+    const weekdays = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+    const header = container.createDiv({ cls: "calendar-header" });
+    weekdays.forEach((day) => header.createEl("div", { text: day, cls: "calendar-day-header" }));
+    const grid = container.createDiv({ cls: "calendar-grid" });
+    let current = new Date(startDate);
+    while (current <= lastDay || current.getDay() !== 0) {
+      const dayEl = grid.createDiv({ cls: "calendar-day" });
+      if (current.getMonth() === month) {
+        dayEl.addClass("current-month");
+        dayEl.setText(current.getDate().toString());
+        const dateStr = current.toISOString().slice(0, 10);
+        const task = this.tasks.find((t) => t.date === dateStr);
+        if (task) {
+          dayEl.addClass("has-task");
+          dayEl.setAttribute("title", `${task.topics.length} Themen`);
+        }
+      } else {
+        dayEl.addClass("other-month");
+      }
+      current.setDate(current.getDate() + 1);
+    }
   }
 };

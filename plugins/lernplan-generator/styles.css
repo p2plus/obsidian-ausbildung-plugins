@@ -2,3 +2,75 @@
   color: var(--text-muted);
 }
 
+.plan-preview-modal {
+  min-width: 600px;
+  min-height: 500px;
+}
+
+.plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.plan-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.plan-calendar {
+  margin-bottom: 1rem;
+}
+
+.calendar-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-weight: bold;
+  color: var(--text-muted);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  font-size: 0.9rem;
+}
+
+.calendar-day.current-month {
+  background: var(--background-primary);
+}
+
+.calendar-day.has-task {
+  background: #2f7d61;
+  color: white;
+  font-weight: bold;
+}
+
+.calendar-day.other-month {
+  color: var(--text-faint);
+  background: var(--background-modifier-border-hover);
+}
+
+.plan-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}

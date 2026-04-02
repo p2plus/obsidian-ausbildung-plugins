@@ -163,3 +163,70 @@
   color: var(--text-muted);
   line-height: 1.45;
 }
+
+.analytics-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.analytics-tab {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.analytics-tab.active {
+  background: var(--ausbildung-accent);
+  color: white;
+}
+
+.analytics-content {
+  padding: 1.15rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.analytics-hidden {
+  display: none;
+}
+
+.analytics-chart {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
+.pie-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.pie-bar {
+  height: 10px;
+  background: var(--ausbildung-accent);
+  border-radius: 5px;
+  flex: 1;
+  margin-left: 1rem;
+}
+
+.chart-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.chart-bar-fill {
+  height: 15px;
+  background: #2f7d61;
+  border-radius: 7px;
+  min-width: 20px;
+}

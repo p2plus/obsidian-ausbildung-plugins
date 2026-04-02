@@ -842,11 +842,18 @@ var ReviewQueueModal = class extends import_obsidian2.Modal {
     hero.createEl("h2", { cls: "ausbildung-modal__title", text: "Review Queue Preview" });
     hero.createEl("p", {
       cls: "ausbildung-modal__subtitle",
-      text: "Faellige Wiederholungen, priorisiert fuer den heutigen Durchgang."
+      text: "Faellige Wiederholungen, priorisiert fuer den heutigen Durchgang. Verwende Filter zur Anpassung."
     });
     const stats = shell.createDiv({ cls: "ausbildung-modal__stats" });
     const queueStat = createStatCard(stats, "Due today", "...");
     const aiStat = createStatCard(stats, "Mode", this.plugin.settings.aiEnabled ? "AI + local" : "Local only");
+    const progressStat = createStatCard(stats, "Filtered", "...");
+    const filters = shell.createDiv({ cls: "ausbildung-modal__filters" });
+    const priorityFilter = filters.createEl("select", { cls: "ausbildung-filter" });
+    priorityFilter.createEl("option", { value: "all", text: "Alle Priorit\xE4ten" });
+    priorityFilter.createEl("option", { value: "high", text: "Hohe (1-3)" });
+    priorityFilter.createEl("option", { value: "medium", text: "Mittel (4-6)" });
+    priorityFilter.createEl("option", { value: "low", text: "Niedrig (7+)" });
     const body = shell.createDiv({ cls: "ausbildung-modal__body" });
     const summary = body.createDiv({ cls: "ausbildung-modal__summary" });
     const preview = body.createDiv({ cls: "ausbildung-modal__rendered" });
@@ -856,28 +863,30 @@ var ReviewQueueModal = class extends import_obsidian2.Modal {
     saveButton.disabled = true;
     const closeButton = actions.createEl("button", { text: "Close" });
     closeButton.addEventListener("click", () => this.close());
+    let allItems = [];
+    let filteredItems = [];
     try {
       const { markdown, fileName } = await this.plugin.buildQueueMarkdown();
-      const itemCount = (markdown.match(/^- \[ \]/gm) ?? []).length;
+      allItems = this.parseQueueItems(markdown);
+      filteredItems = [...allItems];
+      const itemCount = allItems.length;
       queueStat.setText(String(itemCount));
       aiStat.setText(this.plugin.settings.aiEnabled ? "AI-ready" : "Fallback");
+      progressStat.setText(String(filteredItems.length));
       summary.empty();
       summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Daily limit: ${this.plugin.settings.dailyQueueLimit}` });
       summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Target: ${fileName}` });
-      preview.empty();
-      if (itemCount === 0) {
-        preview.createDiv({
-          cls: "ausbildung-modal__empty",
-          text: "Keine faelligen Reviews gefunden. Sobald Notizen ein next_review in der Vergangenheit oder heute haben, erscheint hier deine Queue."
-        });
-      } else {
-        await import_obsidian2.MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
-      }
+      await this.renderPreview(preview, filteredItems);
       saveButton.setText(`Save as ${fileName}`);
       saveButton.disabled = itemCount === 0;
       saveButton.addEventListener("click", async () => {
         await this.plugin.generateQueue();
         this.close();
+      });
+      priorityFilter.addEventListener("change", () => {
+        filteredItems = this.applyPriorityFilter(allItems, priorityFilter.value);
+        progressStat.setText(String(filteredItems.length));
+        void this.renderPreview(preview, filteredItems);
       });
     } catch (error) {
       preview.empty();
@@ -885,6 +894,42 @@ var ReviewQueueModal = class extends import_obsidian2.Modal {
         cls: "ausbildung-modal__error",
         text: `Queue konnte nicht erzeugt werden: ${String(error)}`
       });
+    }
+  }
+  parseQueueItems(markdown) {
+    const lines = markdown.split("\n");
+    const items = [];
+    for (const [index, line] of lines.entries()) {
+      const match = line.match(/^- \[ \] \[\[([^\]]+)\]\] \| Prioritaet (\d+) \| (.+)$/);
+      if (match) {
+        const [, title, priority, reason] = match;
+        const promptMatch = lines[index + 1]?.match(/  - Prompt: (.+)$/);
+        const recapPrompt = promptMatch ? promptMatch[1] : "";
+        items.push({ title, priority: parseInt(priority), reason, recapPrompt });
+      }
+    }
+    return items;
+  }
+  applyPriorityFilter(items, filter) {
+    if (filter === "all") return items;
+    if (filter === "high") return items.filter((item) => item.priority <= 3);
+    if (filter === "medium") return items.filter((item) => item.priority > 3 && item.priority <= 6);
+    if (filter === "low") return items.filter((item) => item.priority > 6);
+    return items;
+  }
+  async renderPreview(preview, items) {
+    preview.empty();
+    if (items.length === 0) {
+      preview.createDiv({
+        cls: "ausbildung-modal__empty",
+        text: "Keine Reviews entsprechen den Filterkriterien."
+      });
+    } else {
+      const markdown = "# Review Queue\n\n" + items.map(
+        (entry) => `- [ ] [[${entry.title}]] | Prioritaet ${entry.priority} | ${entry.reason}
+  - Prompt: ${entry.recapPrompt}`
+      ).join("\n");
+      await import_obsidian2.MarkdownRenderer.render(this.app, markdown, preview, "", this.plugin);
     }
   }
 };

@@ -20,14 +20,12 @@ flowchart LR
     Shared --> Review["spaced-repetition-engine"]
     Shared --> Quiz["quiz-generator-markdown"]
     Shared --> Analytics["ausbildungs-analytics-dashboard"]
-    Shared --> Keywords["ihk-keyword-tracker"]
     Dashboard --> Outputs["Markdown Outputs"]
     Exam --> Outputs
     Planner --> Outputs
     Review --> Outputs
     Quiz --> Outputs
     Analytics --> Outputs
-    Keywords --> Outputs
 ```
 
 The repository includes:
@@ -36,6 +34,7 @@ The repository includes:
 - shared logic and tests
 - CI setup
 - a synthetic `test-vault` for reproducible QA
+- onboarding docs, note templates, and a vault bootstrap script
 
 What it does not include:
 
@@ -58,6 +57,11 @@ The current BYOK layer supports:
 
 - OpenAI
 - OpenRouter
+- Anthropic
+- Google
+- Z.AI
+- MiniMax
+- Moonshot
 - custom OpenAI-compatible endpoints
 
 Each plugin keeps a local fallback path. If AI is disabled, a key is missing, or a provider request fails, the plugin should still remain usable.
@@ -101,7 +105,6 @@ These are the most advanced plugins in the repository, but the repository as a w
 - `spaced-repetition-engine`
 - `quiz-generator-markdown`
 - `ausbildungs-analytics-dashboard`
-- `ihk-keyword-tracker`
 
 Experimental means the plugin is usable, but not yet held to the same release confidence as Tier 1.
 
@@ -139,3 +142,16 @@ For AI-backed features, also verify:
 - provider connection test
 - visible connection status in settings
 - graceful fallback when the key is removed or the provider is unavailable
+
+## User onboarding
+
+For a real user workflow, start here:
+
+- [docs/getting-started.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/getting-started.md)
+- [docs/vault-onboarding.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/vault-onboarding.md)
+- [docs/tools-and-prompts.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/tools-and-prompts.md)
+
+Included helpers:
+
+- note templates in [templates](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates)
+- a bootstrap script in [scripts/bootstrap_vault.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/bootstrap_vault.py)

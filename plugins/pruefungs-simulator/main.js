@@ -626,6 +626,8 @@ var DEFAULT_SETTINGS = {
 var ExamModal = class extends import_obsidian2.Modal {
   constructor(app, file, markdown, onSubmitAttempt) {
     super(app);
+    this.timerInterval = null;
+    this.submitted = false;
     this.file = file;
     this.markdown = markdown;
     this.onSubmitAttempt = onSubmitAttempt;
@@ -634,14 +636,29 @@ var ExamModal = class extends import_obsidian2.Modal {
     const exam = parseExamMarkdown(this.markdown);
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: exam.title });
-    contentEl.createEl("p", { text: `Zeitlimit: ${exam.zeitlimitMin} Minuten` });
+    const header = contentEl.createDiv({ cls: "exam-header" });
+    header.createEl("h2", { text: exam.title });
+    const timerEl = header.createEl("div", { cls: "exam-timer", text: `Zeit: ${exam.zeitlimitMin}:00` });
+    const progressEl = header.createEl("div", { cls: "exam-progress" });
+    const progressBar = progressEl.createEl("div", { cls: "exam-progress-bar" });
+    progressEl.createEl("span", { text: `0/${exam.questions.length} Fragen beantwortet` });
     const answerMap = /* @__PURE__ */ new Map();
-    exam.questions.forEach((question) => {
+    const endTime = Date.now() + exam.zeitlimitMin * 60 * 1e3;
+    this.timerInterval = window.setInterval(() => {
+      const remaining = Math.max(0, endTime - Date.now());
+      const minutes = Math.floor(remaining / 6e4);
+      const seconds = Math.floor(remaining % 6e4 / 1e3);
+      timerEl.setText(`Zeit: ${minutes}:${seconds.toString().padStart(2, "0")}`);
+      if (remaining <= 0) {
+        this.clearTimer();
+        void this.submitExam(exam, answerMap);
+      }
+    }, 1e3);
+    exam.questions.forEach((question, qIndex) => {
       const container = contentEl.createDiv({ cls: "exam-question" });
-      container.createEl("h3", { text: question.prompt });
+      container.createEl("h3", { text: `${qIndex + 1}. ${question.prompt}` });
       question.options.forEach((option, optionIndex) => {
-        const label = container.createEl("label");
+        const label = container.createEl("label", { cls: "exam-option" });
         const input = label.createEl("input", { type: "checkbox" });
         input.addEventListener("change", () => {
           const selected = answerMap.get(question.id) ?? [];
@@ -654,26 +671,84 @@ var ExamModal = class extends import_obsidian2.Modal {
             }
           }
           answerMap.set(question.id, [...new Set(selected)].sort());
+          this.updateProgress(answerMap, exam.questions.length, progressBar, progressEl);
         });
         label.appendText(` ${option}`);
-        container.createEl("br");
       });
     });
-    const submitButton = contentEl.createEl("button", { text: "Pruefung abgeben" });
+    const submitButton = contentEl.createEl("button", { cls: "exam-submit", text: "Pruefung abgeben" });
     submitButton.addEventListener("click", async () => {
-      const answers = exam.questions.map((question) => ({
-        questionId: question.id,
-        selectedIndexes: answerMap.get(question.id) ?? []
-      }));
-      const result = gradeAttempt(exam, answers);
-      await this.onSubmitAttempt({
-        filePath: this.file.path,
-        title: exam.title,
-        submittedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        result
-      });
-      this.close();
+      this.clearTimer();
+      await this.submitExam(exam, answerMap);
     });
+  }
+  onClose() {
+    this.clearTimer();
+  }
+  clearTimer() {
+    if (this.timerInterval !== null) {
+      window.clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+  }
+  updateProgress(answerMap, total, progressBar, progressEl) {
+    const answered = Array.from(answerMap.values()).filter((arr) => arr.length > 0).length;
+    const percentage = answered / total * 100;
+    progressBar.style.width = `${percentage}%`;
+    progressEl.lastElementChild.setText(`${answered}/${total} Fragen beantwortet`);
+  }
+  async submitExam(exam, answerMap) {
+    if (this.submitted) {
+      return;
+    }
+    this.submitted = true;
+    const answers = exam.questions.map((question) => ({
+      questionId: question.id,
+      selectedIndexes: answerMap.get(question.id) ?? []
+    }));
+    const result = gradeAttempt(exam, answers);
+    await this.onSubmitAttempt({
+      filePath: this.file.path,
+      title: exam.title,
+      submittedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      result
+    });
+    this.close();
+    new ExamResultModal(this.app, result).open();
+  }
+};
+var ExamResultModal = class extends import_obsidian2.Modal {
+  constructor(app, result) {
+    super(app);
+    this.result = result;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    const shell = contentEl.createDiv({ cls: "exam-result-modal" });
+    shell.createEl("h2", { text: "Pr\xFCfungsergebnis" });
+    const scoreCard = shell.createDiv({ cls: "result-card" });
+    scoreCard.createEl("h3", { text: "Punkte" });
+    scoreCard.createEl("p", { text: `${this.result.score}/${this.result.maxScore} (${this.result.percentage}%)` });
+    this.renderProgressBar(scoreCard, this.result.percentage);
+    const analytics = shell.createDiv({ cls: "result-analytics" });
+    analytics.createEl("h3", { text: "Analyse" });
+    if (this.result.weakTopics.length > 0) {
+      analytics.createEl("p", { text: `Schwache Themen: ${this.result.weakTopics.join(", ")}` });
+    } else {
+      analytics.createEl("p", { text: "Alle Themen gut beherrscht!" });
+    }
+    const chart = shell.createDiv({ cls: "result-chart" });
+    chart.createEl("h3", { text: "Leistung" });
+    const perfText = this.result.percentage >= 80 ? "Ausgezeichnet" : this.result.percentage >= 60 ? "Gut" : this.result.percentage >= 40 ? "Befriedigend" : "Nicht bestanden";
+    chart.createEl("p", { text: perfText });
+    const closeBtn = shell.createEl("button", { text: "Schlie\xDFen" });
+    closeBtn.addEventListener("click", () => this.close());
+  }
+  renderProgressBar(container, percentage) {
+    const bar = container.createDiv({ cls: "result-progress-bar" });
+    const fill = bar.createDiv({ cls: "result-progress-fill" });
+    fill.style.width = `${percentage}%`;
   }
 };
 var PruefungsSimulatorPlugin = class extends import_obsidian2.Plugin {
