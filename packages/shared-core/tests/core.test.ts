@@ -87,8 +87,14 @@ FRAGE: Demo?
   });
 
   it("builds quiz draft and analytics", () => {
-    const quiz = generateQuizFromMarkdown(demoNote, "# Demo\n## Thema\n- Punkt A");
+    const quiz = generateQuizFromMarkdown(
+      demoNote,
+      "# Demo\n## Thema\n- Punkt A\n- Punkt B\n\nBegriff: Das ist eine wichtige Definition fuer die Pruefung."
+    );
     expect(quiz).toContain("Quiz zu");
+    expect(quiz).toContain('FRAGE: Was nennt die Notiz unter "Thema"?');
+    expect(quiz).toContain('FRAGE: Welche Beschreibung passt am besten zu "Begriff"?');
+    expect(quiz).not.toContain("Diese Antwort muss fachlich aus der Notiz abgeleitet werden.");
     expect(buildAnalyticsReport([demoNote])).toContain("Ausbildungs-Analytics");
   });
 
