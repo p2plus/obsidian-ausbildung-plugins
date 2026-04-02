@@ -93,7 +93,7 @@ Do nothing destructive. Keep the files where they are. Point the plugins at the 
 
 ### 2. New study area inside an existing vault
 
-Create a folder such as `Lernen/` or `Ausbildung/`, use the templates from [templates](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates), and keep the plugin scan scope narrow at first.
+Create a folder such as `Lernen/` or `Ausbildung/`, use the templates from [templates](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates) or the importable snippets from [integrations](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations), and keep the plugin scan scope narrow at first.
 
 ### 3. Bulk onboarding for a large markdown set
 

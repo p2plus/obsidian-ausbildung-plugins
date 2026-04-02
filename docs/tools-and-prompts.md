@@ -13,6 +13,12 @@ These plugins work best when users combine them with a few established Obsidian 
 - `Calendar` for exam dates and milestones
 - `Obsidian Git` for backup and sync
 
+If you want ready-to-use files instead of rebuilding setup by hand, use:
+
+- [docs/templater-and-quickadd.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/templater-and-quickadd.md)
+- [integrations/templater](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/templater)
+- [integrations/quickadd](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/quickadd)
+
 ## Template prompts
 
 ### New learning note
