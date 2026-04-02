@@ -7,6 +7,7 @@ export default class AusbildungsAnalyticsDashboardPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.addRibbonIcon("pie-chart", "Analytics Vorschau oeffnen", () => void this.openPreview());
     this.addCommand({
       id: "generate-analytics-report",
       name: "Analytics: Bericht generieren",

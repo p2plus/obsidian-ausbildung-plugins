@@ -713,6 +713,7 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
 var AusbildungsAnalyticsDashboardPlugin = class extends import_obsidian2.Plugin {
   async onload() {
     await this.loadSettings();
+    this.addRibbonIcon("pie-chart", "Analytics Vorschau oeffnen", () => void this.openPreview());
     this.addCommand({
       id: "generate-analytics-report",
       name: "Analytics: Bericht generieren",

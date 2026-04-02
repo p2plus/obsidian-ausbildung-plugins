@@ -18,6 +18,7 @@ export default class SpacedRepetitionEnginePlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.addRibbonIcon("rotate-cw", "Review Queue Vorschau oeffnen", () => void this.openQueuePreview());
     this.addCommand({
       id: "generate-review-queue",
       name: "Reviews: Faellige Wiederholungen generieren",

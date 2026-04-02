@@ -22,6 +22,7 @@ export default class QuizGeneratorMarkdownPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.addRibbonIcon("list-checks", "Quiz Vorschau oeffnen", () => void this.openPreview());
     this.addCommand({
       id: "generate-quiz-from-current-note",
       name: "Quiz: Aus aktueller Notiz erzeugen",

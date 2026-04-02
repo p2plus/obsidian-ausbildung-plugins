@@ -717,6 +717,7 @@ var DEFAULT_SETTINGS = {
 var SpacedRepetitionEnginePlugin = class extends import_obsidian2.Plugin {
   async onload() {
     await this.loadSettings();
+    this.addRibbonIcon("rotate-cw", "Review Queue Vorschau oeffnen", () => void this.openQueuePreview());
     this.addCommand({
       id: "generate-review-queue",
       name: "Reviews: Faellige Wiederholungen generieren",

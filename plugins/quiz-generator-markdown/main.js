@@ -702,6 +702,7 @@ var DEFAULT_SETTINGS = {
 var QuizGeneratorMarkdownPlugin = class extends import_obsidian2.Plugin {
   async onload() {
     await this.loadSettings();
+    this.addRibbonIcon("list-checks", "Quiz Vorschau oeffnen", () => void this.openPreview());
     this.addCommand({
       id: "generate-quiz-from-current-note",
       name: "Quiz: Aus aktueller Notiz erzeugen",
