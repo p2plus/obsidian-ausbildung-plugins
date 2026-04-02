@@ -1,6 +1,6 @@
 import { Modal, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { generateStudyPlan, renderStudyPlanMarkdown } from "@ausbildung/shared-core";
-import { BasePluginSettings, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
+import { BasePluginSettings, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface PlannerPluginSettings extends BasePluginSettings {
   examDate: string;
@@ -82,7 +82,7 @@ export default class LernplanGeneratorPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
-    this.addRibbonIcon("calendar-days", "Lernplan generieren", () => void this.generatePlan());
+    this.addRibbonIcon("calendar-days", "Lernplan Vorschau oeffnen", () => void this.openPlanPreview());
     this.addCommand({
       id: "generate-study-plan",
       name: "Lernplan: Plan generieren",
@@ -144,6 +144,7 @@ export default class LernplanGeneratorPlugin extends Plugin {
     const markdown = await this.buildPlanMarkdown();
     const path = await writePluginOutput(this.app, this.settings.dashboardFolder, this.settings.outputFileName, markdown);
     noticeSuccess(`Lernplan geschrieben: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
 
   private async writeDailyPlan(): Promise<void> {
@@ -151,6 +152,7 @@ export default class LernplanGeneratorPlugin extends Plugin {
     const fileName = `${new Date().toISOString().slice(0, 10)}-study-plan.md`;
     const path = await writePluginOutput(this.app, this.settings.periodicNotesFolder, fileName, markdown);
     noticeSuccess(`Tagesplan geschrieben: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
 
   private openPlanPreview(): void {

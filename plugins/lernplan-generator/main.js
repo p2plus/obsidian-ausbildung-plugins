@@ -238,6 +238,14 @@ async function writePluginOutput(app, folderPath, fileName, content) {
   }
   return path;
 }
+async function openOutputFile(app, path, newLeaf = false) {
+  const file = app.vault.getAbstractFileByPath(path);
+  if (!(file instanceof import_obsidian.TFile)) {
+    return;
+  }
+  const leaf = app.workspace.getLeaf(newLeaf);
+  await leaf.openFile(file);
+}
 function noticeSuccess(message) {
   new import_obsidian.Notice(message, 4e3);
 }
@@ -459,7 +467,7 @@ var LernplanSettingsTab = class extends import_obsidian2.PluginSettingTab {
 var LernplanGeneratorPlugin = class extends import_obsidian2.Plugin {
   async onload() {
     await this.loadSettings();
-    this.addRibbonIcon("calendar-days", "Lernplan generieren", () => void this.generatePlan());
+    this.addRibbonIcon("calendar-days", "Lernplan Vorschau oeffnen", () => void this.openPlanPreview());
     this.addCommand({
       id: "generate-study-plan",
       name: "Lernplan: Plan generieren",
@@ -518,12 +526,14 @@ ${aiResponse.rawText}`;
     const markdown = await this.buildPlanMarkdown();
     const path = await writePluginOutput(this.app, this.settings.dashboardFolder, this.settings.outputFileName, markdown);
     noticeSuccess(`Lernplan geschrieben: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
   async writeDailyPlan() {
     const markdown = await this.buildPlanMarkdown();
     const fileName = `${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}-study-plan.md`;
     const path = await writePluginOutput(this.app, this.settings.periodicNotesFolder, fileName, markdown);
     noticeSuccess(`Tagesplan geschrieben: ${path}`);
+    await openOutputFile(this.app, path, true);
   }
   openPlanPreview() {
     new PlanPreviewModal(this.app, this).open();

@@ -16,7 +16,7 @@ export default class LernfortschrittDashboardPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
-    this.addRibbonIcon("bar-chart-3", "Lernfortschritt Snapshot", () => void this.generateSnapshot());
+    this.addRibbonIcon("bar-chart-3", "Dashboard Live-Ansicht oeffnen", () => void this.openLiveDashboard());
     this.addCommand({
       id: "generate-dashboard-snapshot",
       name: "Dashboard: Snapshot generieren",

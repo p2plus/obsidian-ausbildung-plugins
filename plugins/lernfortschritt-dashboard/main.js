@@ -705,7 +705,7 @@ var DEFAULT_SETTINGS = {
 var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
   async onload() {
     await this.loadSettings();
-    this.addRibbonIcon("bar-chart-3", "Lernfortschritt Snapshot", () => void this.generateSnapshot());
+    this.addRibbonIcon("bar-chart-3", "Dashboard Live-Ansicht oeffnen", () => void this.openLiveDashboard());
     this.addCommand({
       id: "generate-dashboard-snapshot",
       name: "Dashboard: Snapshot generieren",
