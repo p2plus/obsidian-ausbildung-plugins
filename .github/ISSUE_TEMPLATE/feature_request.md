@@ -1,13 +1,18 @@
 ---
-name: Feature request
-about: Suggest a learning workflow improvement
+name: Workflow or feature request
+about: Suggest a concrete improvement to a learning workflow
 ---
 
-## Plugin
+## Plugin or area
 
-## User problem
+## What is awkward today
 
-## Proposed behavior
+## What would make it better
 
-## Notes
+## Real use case
 
+Describe the notes, workflow, or exam-prep situation this would improve.
+
+## Rough idea, if you have one
+
+No need for a full spec. Even a half-formed idea is enough if the user problem is clear.

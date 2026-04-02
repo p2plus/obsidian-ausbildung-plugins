@@ -13,6 +13,8 @@
     "lint": "tsc -p tsconfig.json --noEmit --pretty false",
     "check": "npm run lint && npm run test && npm run build",
     "bootstrap:vault": "python3 scripts/bootstrap_vault.py --help",
+    "install:plugin": "python3 scripts/install_plugin.py --help",
+    "package:releases": "python3 scripts/package_releases.py",
     "dev:dashboard": "npm run dev --workspace lernfortschritt-dashboard",
     "dev:exam": "npm run dev --workspace pruefungs-simulator",
     "dev:planner": "npm run dev --workspace lernplan-generator"

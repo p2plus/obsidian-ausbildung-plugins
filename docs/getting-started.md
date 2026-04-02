@@ -22,7 +22,9 @@ npm install
 npm run build
 ```
 
-3. Copy each plugin's runtime files into the target vault:
+3. Install each plugin into the target vault.
+
+Manual path:
 
 - `plugins/<plugin-id>/main.js`
 - `plugins/<plugin-id>/manifest.json`
@@ -32,6 +34,12 @@ The target location is:
 
 ```text
 <your-vault>/.obsidian/plugins/<plugin-id>/
+```
+
+Or use the helper:
+
+```bash
+python3 scripts/install_plugin.py --plugin lernfortschritt-dashboard --vault "/path/to/your-vault"
 ```
 
 4. Enable the plugins in Obsidian.

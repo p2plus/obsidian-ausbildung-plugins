@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Getting started and vault onboarding
+    url: https://github.com/p2plus/obsidian-ausbildung-plugins/blob/main/docs/getting-started.md
+    about: Start here if you are trying to install the plugins or wire them into an existing vault.
+  - name: Tools, prompts, and note templates
+    url: https://github.com/p2plus/obsidian-ausbildung-plugins/blob/main/docs/tools-and-prompts.md
+    about: Use this if you want the surrounding Obsidian setup, note templates, or prompt ideas.

@@ -35,6 +35,7 @@ The repository includes:
 - CI setup
 - a synthetic `test-vault` for reproducible QA
 - onboarding docs, note templates, and a vault bootstrap script
+- install and packaging helpers for local vault use and GitHub releases
 
 What it does not include:
 
@@ -135,6 +136,14 @@ Build one plugin on its own:
 npm run build --workspace lernfortschritt-dashboard
 ```
 
+Useful repo helpers:
+
+```bash
+python3 scripts/install_plugin.py --help
+python3 scripts/bootstrap_vault.py --help
+python3 scripts/package_releases.py
+```
+
 For manual QA, use the test vault and verify the resulting markdown inside Obsidian.
 
 For AI-backed features, also verify:
@@ -154,4 +163,13 @@ For a real user workflow, start here:
 Included helpers:
 
 - note templates in [templates](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates)
+- a local install helper in [scripts/install_plugin.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/install_plugin.py)
 - a bootstrap script in [scripts/bootstrap_vault.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/bootstrap_vault.py)
+- a release packager in [scripts/package_releases.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/package_releases.py)
+
+## Maintainer docs
+
+For the repo side of the project:
+
+- [docs/roadmap.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/roadmap.md)
+- [docs/community-release-checklist.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/community-release-checklist.md)
