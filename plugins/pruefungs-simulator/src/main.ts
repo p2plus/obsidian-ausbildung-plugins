@@ -1,5 +1,5 @@
 import { App, Modal, Notice, Plugin, TFile } from "obsidian";
-import { ExamAttemptAnswer, ExamAttemptResult, gradeAttempt, parseExamMarkdown } from "@ausbildung/shared-core";
+import { ExamAttemptAnswer, ExamAttemptResult, generateQuizFromMarkdown, gradeAttempt, parseExamMarkdown, parseLearningNote } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, noticeSuccess, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface ExamAttemptLog {
@@ -206,10 +206,16 @@ export default class PruefungsSimulatorPlugin extends Plugin {
       new Notice("Keine aktive Quiz-Notiz gefunden.");
       return;
     }
-    const markdown = await this.app.vault.cachedRead(file);
-    const exam = parseExamMarkdown(markdown);
+    const originalMarkdown = await this.app.vault.cachedRead(file);
+    let markdown = originalMarkdown;
+    let exam = parseExamMarkdown(markdown);
     if (exam.questions.length === 0) {
-      new Notice("Diese Notiz enthaelt keine auswertbaren Multiple-Choice-Fragen.");
+      const note = parseLearningNote(file.path, originalMarkdown);
+      markdown = generateQuizFromMarkdown(note, originalMarkdown);
+      exam = parseExamMarkdown(markdown);
+    }
+    if (exam.questions.length === 0) {
+      new Notice("Diese Notiz enthaelt noch zu wenig klar strukturierte Fakten fuer eine lokale Pruefung.");
       return;
     }
     new ExamModal(this.app, file, markdown, async (attempt) => {
