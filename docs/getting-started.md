@@ -95,6 +95,8 @@ Do nothing destructive. Keep the files where they are. Point the plugins at the 
 
 Create a folder such as `Lernen/` or `Ausbildung/`, use the templates from [templates](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates) or the importable snippets from [integrations](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations), and keep the plugin scan scope narrow at first.
 
+If you want help choosing the right template instead of guessing, use [docs/templater-and-quickadd.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/templater-and-quickadd.md).
+
 ### 3. Bulk onboarding for a large markdown set
 
 Use the bootstrap script from [scripts/bootstrap_vault.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/bootstrap_vault.py) to copy notes into a dedicated import area and inject baseline YAML.

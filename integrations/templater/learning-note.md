@@ -14,19 +14,33 @@ created: "<% tp.date.now('YYYY-MM-DD') %>"
 
 # <% tp.file.title %>
 
+> Verwende diese Vorlage fuer Theorie- oder Konzeptnotizen, die spaeter in Reviews, Dashboards und Quiz-Ableitungen brauchbar bleiben sollen.
+
 ## Kurzfassung
 
 -
 
-## Kernbegriffe
+## Was ich verstehen muss
 
 -
 
-## Beispiele
+## Kernbegriffe und Definitionen
+
+-
+
+## Typische Verwechslungen oder Fallen
+
+-
+
+## Ein greifbares Beispiel
 
 -
 
 ## Pruefungsbezug
+
+-
+
+## Merksatz fuer spaeter
 
 -
 

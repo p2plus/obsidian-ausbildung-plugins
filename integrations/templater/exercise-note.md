@@ -14,6 +14,8 @@ created: "<% tp.date.now('YYYY-MM-DD') %>"
 
 # <% tp.file.title %>
 
+> Verwende diese Vorlage fuer Aufgaben, Rechenwege, kleine Faelle und alles, was aktiv geloest werden soll statt nur gelesen zu werden.
+
 ## Aufgabe
 
 -
@@ -22,13 +24,18 @@ created: "<% tp.date.now('YYYY-MM-DD') %>"
 
 -
 
-## Bearbeitung
+## Loesungsweg
 
 -
 
 ## Ergebnis
 
 -
+
+## Selbstcheck
+
+- Wuerde ich das in 5 Minuten nochmal sauber erklaeren koennen?
+- Wo war ich unsicher?
 
 ## Fehler und Learnings
 

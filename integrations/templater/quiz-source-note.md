@@ -10,6 +10,8 @@ created: "<% tp.date.now('YYYY-MM-DD') %>"
 
 # <% tp.file.title %>
 
+> Verwende diese Vorlage fuer kompakte Faktennotizen, aus denen spaeter gute Quizfragen gebaut werden koennen.
+
 ## Kernfakten
 
 -
@@ -19,6 +21,10 @@ created: "<% tp.date.now('YYYY-MM-DD') %>"
 -
 
 ## Typische Verwechslungen
+
+-
+
+## Was in einer Pruefung leicht gefragt werden kann
 
 -
 
