@@ -7,4 +7,5 @@ export * from "./notes";
 export * from "./planner";
 export * from "./quiz";
 export * from "./repetition";
+export * from "./study-material";
 export * from "./types";

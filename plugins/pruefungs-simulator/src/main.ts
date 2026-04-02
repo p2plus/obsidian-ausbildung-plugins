@@ -1,5 +1,5 @@
 import { App, Modal, Notice, Plugin, TFile } from "obsidian";
-import { ExamAttemptAnswer, ExamAttemptResult, generateQuizFromMarkdown, gradeAttempt, parseExamMarkdown, parseLearningNote } from "@ausbildung/shared-core";
+import { analyzeStudyMaterial, ExamAttemptAnswer, ExamAttemptResult, generateQuizFromMarkdown, gradeAttempt, parseExamMarkdown, parseLearningNote } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, noticeSuccess, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface ExamAttemptLog {
@@ -211,6 +211,10 @@ export default class PruefungsSimulatorPlugin extends Plugin {
     let exam = parseExamMarkdown(markdown);
     if (exam.questions.length === 0) {
       const note = parseLearningNote(file.path, originalMarkdown);
+      const signals = analyzeStudyMaterial(originalMarkdown);
+      if (signals.readinessScore < 4) {
+        new Notice(`Die Notiz ist fuer lokale Pruefungsfragen noch schwach vorbereitet: ${signals.issues.join(", ")}`);
+      }
       markdown = generateQuizFromMarkdown(note, originalMarkdown);
       exam = parseExamMarkdown(markdown);
     }

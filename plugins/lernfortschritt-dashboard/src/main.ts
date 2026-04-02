@@ -1,5 +1,5 @@
 import { Modal, Notice, Plugin } from "obsidian";
-import { calculateDashboardMetrics, renderDashboardMarkdown } from "@ausbildung/shared-core";
+import { analyzeStudyMaterial, calculateDashboardMetrics, renderDashboardMarkdown } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getDataviewApi, noticeSuccess, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface DashboardSettings extends BasePluginSettings {
@@ -51,9 +51,10 @@ export default class LernfortschrittDashboardPlugin extends Plugin {
   async generateSnapshot(): Promise<void> {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const metrics = calculateDashboardMetrics(scanned.map((entry) => entry.note));
+    const readyCount = scanned.filter((entry) => analyzeStudyMaterial(entry.markdown).readinessScore >= 4).length;
     const dataviewApi = getDataviewApi(this, this.settings.useDataview);
     const dataviewHint = dataviewApi ? "\n\n> Dataview erkannt: Live-Abfragen koennen in dieser Snapshot-Note ergaenzt werden.\n" : "\n\n> Dataview nicht aktiv: Snapshot basiert auf sicherem Vault-Scan.\n";
-    const content = `${renderDashboardMarkdown(metrics)}${dataviewHint}`;
+    const content = `${renderDashboardMarkdown(metrics)}\n\n## Materialqualitaet\n- Gut nutzbare Lernnotizen: ${readyCount}\n- Noch duenn strukturierte Notizen: ${metrics.total - readyCount}${dataviewHint}`;
     const path = await writePluginOutput(this.app, this.settings.dashboardFolder, this.settings.snapshotFileName, content);
     noticeSuccess(`Dashboard geschrieben: ${path}`);
   }

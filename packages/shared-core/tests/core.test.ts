@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAnalyticsAiRequest,
+  analyzeStudyMaterial,
   buildKeywordGapAiRequest,
   buildQuizAiRequest,
   buildAnalyticsReport,
@@ -96,6 +97,16 @@ FRAGE: Demo?
     expect(quiz).toContain('FRAGE: Welche Beschreibung passt am besten zu "Begriff"?');
     expect(quiz).not.toContain("Diese Antwort muss fachlich aus der Notiz abgeleitet werden.");
     expect(buildAnalyticsReport([demoNote])).toContain("Ausbildungs-Analytics");
+  });
+
+  it("analyzes study material readiness", () => {
+    const signals = analyzeStudyMaterial(
+      "# Thema\n## Grundlagen\n- Punkt A\n- Punkt B\n\nBegriff: Eine saubere Definition fuer die Pruefung.\n\nDas ist eine etwas laengere Kernaussage fuer die Wiederholung."
+    );
+    expect(signals.headings.length).toBeGreaterThanOrEqual(2);
+    expect(signals.definitions).toHaveLength(1);
+    expect(signals.bulletFacts.length).toBeGreaterThanOrEqual(2);
+    expect(signals.readinessScore).toBeGreaterThan(0);
   });
 
   it("normalizes AI payloads", () => {

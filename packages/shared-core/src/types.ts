@@ -31,6 +31,15 @@ export interface LearningNote {
   tags?: string[];
 }
 
+export interface StudyMaterialSignals {
+  headings: string[];
+  definitions: Array<{ term: string; description: string }>;
+  bulletFacts: Array<{ heading?: string; text: string }>;
+  statements: string[];
+  readinessScore: number;
+  issues: string[];
+}
+
 export interface DashboardMetrics {
   total: number;
   byStatus: Record<string, number>;

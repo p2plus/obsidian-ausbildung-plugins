@@ -1,5 +1,5 @@
 import { MarkdownRenderer, Modal, Notice, Plugin, Setting } from "obsidian";
-import { buildQuizAiRequest, generateQuizFromMarkdown, normalizeQuizDraftQuestions, parseLearningNote, QuizDraftQuestion } from "@ausbildung/shared-core";
+import { analyzeStudyMaterial, buildQuizAiRequest, generateQuizFromMarkdown, normalizeQuizDraftQuestions, parseLearningNote, QuizDraftQuestion } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface QuizSettings extends BasePluginSettings {
@@ -59,6 +59,10 @@ export default class QuizGeneratorMarkdownPlugin extends Plugin {
     }
     const markdown = await this.app.vault.cachedRead(file);
     const note = parseLearningNote(file.path, markdown);
+    const signals = analyzeStudyMaterial(markdown);
+    if (signals.readinessScore < 4) {
+      new Notice(`Die Notiz ist noch duenn strukturiert: ${signals.issues.join(", ")}`);
+    }
     let quizMarkdown = generateQuizFromMarkdown(note, markdown);
     const provider = getAiProviderConfig(this.settings);
     if (this.settings.generationMode === "ai-enhanced" && provider) {
@@ -206,11 +210,18 @@ class QuizPreviewModal extends Modal {
     closeButton.addEventListener("click", () => this.close());
     try {
       const result = await this.plugin.buildQuizFromCurrent();
+      const activeFile = this.app.workspace.getActiveFile();
+      const sourceMarkdown = activeFile ? await this.app.vault.cachedRead(activeFile) : "";
+      const signals = analyzeStudyMaterial(sourceMarkdown);
       const questionCount = (result.markdown.match(/^## Frage /gm) ?? []).length;
       questionStat.setText(String(questionCount));
       summary.empty();
       summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Output: ${this.plugin.settings.outputFolder}/${result.fileName}` });
       summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Target level: ${this.plugin.settings.examLevel}` });
+      summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Readiness: ${signals.readinessScore}` });
+      if (signals.issues.length > 0) {
+        summary.createDiv({ cls: "ausbildung-modal__summary-item", text: `Hinweis: ${signals.issues.join(", ")}` });
+      }
       this.renderPreview(previewContainer, result.markdown);
       this.renderEdit(editContainer, result.markdown);
       this.renderExport(exportContainer, () => this.getEditedMarkdown(editContainer, result.markdown), result.fileName);

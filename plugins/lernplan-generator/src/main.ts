@@ -1,5 +1,5 @@
 import { Modal, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
-import { generateStudyPlan, renderStudyPlanMarkdown } from "@ausbildung/shared-core";
+import { analyzeStudyMaterial, generateStudyPlan, renderStudyPlanMarkdown } from "@ausbildung/shared-core";
 import { BasePluginSettings, DEFAULT_BASE_SETTINGS, getAiProviderConfig, noticeSuccess, openOutputFile, runAiRequest, scanVault, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface PlannerPluginSettings extends BasePluginSettings {
@@ -111,6 +111,13 @@ export default class LernplanGeneratorPlugin extends Plugin {
 
   async buildPlanMarkdown(): Promise<string> {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
+    const readiness = scanned.map((entry) => ({
+      path: entry.note.path,
+      title: entry.note.title,
+      signals: analyzeStudyMaterial(entry.markdown)
+    }));
+    const readyCount = readiness.filter((entry) => entry.signals.readinessScore >= 4).length;
+    const weakCount = readiness.length - readyCount;
     const tasks = generateStudyPlan(
       scanned.map((entry) => entry.note),
       {
@@ -120,7 +127,14 @@ export default class LernplanGeneratorPlugin extends Plugin {
         vacationDays: this.settings.vacationDays
       }
     );
-    let markdown = renderStudyPlanMarkdown(tasks);
+    let markdown = [
+      "# Ausgangslage",
+      "",
+      `- Auswertbare Lernnotizen: ${readyCount}`,
+      `- Notizen mit schwacher Struktur: ${weakCount}`,
+      "",
+      renderStudyPlanMarkdown(tasks)
+    ].join("\n");
 
     // Add AI suggestions if available
     const provider = getAiProviderConfig(this.settings);

@@ -172,6 +172,80 @@ function renderStudyPlanMarkdown(tasks) {
   return lines.join("\n");
 }
 
+// ../../packages/shared-core/src/study-material.ts
+function cleanInlineMarkdown(text) {
+  return text.replace(/\[\[([^\]]+)\]\]/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1").trim();
+}
+function normalizeSentence(text) {
+  return cleanInlineMarkdown(text).replace(/^[-*]\s+/, "").replace(/\s+/g, " ").trim();
+}
+function analyzeStudyMaterial(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const headings = [];
+  const definitions = [];
+  const bulletFacts = [];
+  const statements = [];
+  let currentHeading = "";
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed === "---") {
+      continue;
+    }
+    if (/^#{1,6}\s+/.test(trimmed)) {
+      const heading = normalizeSentence(trimmed.replace(/^#{1,6}\s+/, ""));
+      if (heading) {
+        headings.push(heading);
+        currentHeading = heading;
+      }
+      continue;
+    }
+    const normalized = normalizeSentence(trimmed);
+    if (!normalized) {
+      continue;
+    }
+    const definitionMatch = normalized.match(/^([^:]{3,80}):\s+(.{10,})$/);
+    if (definitionMatch) {
+      definitions.push({
+        term: definitionMatch[1].trim(),
+        description: definitionMatch[2].trim()
+      });
+      continue;
+    }
+    if (/^[-*]\s+/.test(trimmed)) {
+      bulletFacts.push({
+        heading: currentHeading || void 0,
+        text: normalized
+      });
+      continue;
+    }
+    if (normalized.length >= 35 && normalized.length <= 220 && !normalized.startsWith("status:")) {
+      statements.push(normalized);
+    }
+  }
+  const issues = [];
+  if (headings.length < 2) {
+    issues.push("wenig klare Abschnittsstruktur");
+  }
+  if (definitions.length === 0) {
+    issues.push("keine expliziten Definitionen");
+  }
+  if (bulletFacts.length === 0) {
+    issues.push("kaum stichpunktartige Fakten");
+  }
+  if (statements.length === 0) {
+    issues.push("wenige ausformulierte Kernaussagen");
+  }
+  const readinessScore = Math.min(headings.length, 4) * 2 + Math.min(definitions.length, 4) * 3 + Math.min(bulletFacts.length, 6) * 2 + Math.min(statements.length, 4) * 1;
+  return {
+    headings,
+    definitions,
+    bulletFacts,
+    statements,
+    readinessScore,
+    issues
+  };
+}
+
 // ../../packages/plugin-kit/src/index.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_BASE_SETTINGS = {
@@ -493,6 +567,13 @@ var LernplanGeneratorPlugin = class extends import_obsidian2.Plugin {
   }
   async buildPlanMarkdown() {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
+    const readiness = scanned.map((entry) => ({
+      path: entry.note.path,
+      title: entry.note.title,
+      signals: analyzeStudyMaterial(entry.markdown)
+    }));
+    const readyCount = readiness.filter((entry) => entry.signals.readinessScore >= 4).length;
+    const weakCount = readiness.length - readyCount;
     const tasks = generateStudyPlan(
       scanned.map((entry) => entry.note),
       {
@@ -502,7 +583,14 @@ var LernplanGeneratorPlugin = class extends import_obsidian2.Plugin {
         vacationDays: this.settings.vacationDays
       }
     );
-    let markdown = renderStudyPlanMarkdown(tasks);
+    let markdown = [
+      "# Ausgangslage",
+      "",
+      `- Auswertbare Lernnotizen: ${readyCount}`,
+      `- Notizen mit schwacher Struktur: ${weakCount}`,
+      "",
+      renderStudyPlanMarkdown(tasks)
+    ].join("\n");
     const provider = getAiProviderConfig(this.settings);
     if (provider) {
       try {

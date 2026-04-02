@@ -178,72 +178,81 @@ function gradeAttempt(exam, answers) {
   };
 }
 
-// ../../packages/shared-core/src/quiz.ts
+// ../../packages/shared-core/src/study-material.ts
 function cleanInlineMarkdown(text) {
   return text.replace(/\[\[([^\]]+)\]\]/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1").trim();
 }
 function normalizeSentence(text) {
   return cleanInlineMarkdown(text).replace(/^[-*]\s+/, "").replace(/\s+/g, " ").trim();
 }
-function buildDefinitionSeeds(lines) {
-  const seeds = [];
-  for (const rawLine of lines) {
-    const line = normalizeSentence(rawLine);
-    if (line.startsWith("#") || line.length < 12) {
-      continue;
-    }
-    const match = line.match(/^([^:]{3,80}):\s+(.{10,})$/);
-    if (!match) {
-      continue;
-    }
-    const [, term, description] = match;
-    seeds.push({
-      question: `Welche Beschreibung passt am besten zu "${term.trim()}"?`,
-      answer: description.trim(),
-      explanation: `Die Notiz beschreibt "${term.trim()}" direkt mit: ${description.trim()}`
-    });
-  }
-  return seeds;
-}
-function buildHeadingBulletSeeds(lines) {
-  const seeds = [];
+function analyzeStudyMaterial(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const headings = [];
+  const definitions = [];
+  const bulletFacts = [];
+  const statements = [];
   let currentHeading = "";
   for (const rawLine of lines) {
     const trimmed = rawLine.trim();
-    if (/^#{2,}\s+/.test(trimmed)) {
-      currentHeading = normalizeSentence(trimmed.replace(/^#{2,}\s+/, ""));
+    if (!trimmed || trimmed === "---") {
       continue;
     }
-    if (!currentHeading || !/^[-*]\s+/.test(trimmed)) {
+    if (/^#{1,6}\s+/.test(trimmed)) {
+      const heading = normalizeSentence(trimmed.replace(/^#{1,6}\s+/, ""));
+      if (heading) {
+        headings.push(heading);
+        currentHeading = heading;
+      }
       continue;
     }
-    const bullet = normalizeSentence(trimmed);
-    if (bullet.length < 6) {
+    const normalized = normalizeSentence(trimmed);
+    if (!normalized) {
       continue;
     }
-    seeds.push({
-      question: `Was nennt die Notiz unter "${currentHeading}"?`,
-      answer: bullet,
-      explanation: `Unter "${currentHeading}" steht in der Notiz: ${bullet}`
-    });
+    const definitionMatch = normalized.match(/^([^:]{3,80}):\s+(.{10,})$/);
+    if (definitionMatch) {
+      definitions.push({
+        term: definitionMatch[1].trim(),
+        description: definitionMatch[2].trim()
+      });
+      continue;
+    }
+    if (/^[-*]\s+/.test(trimmed)) {
+      bulletFacts.push({
+        heading: currentHeading || void 0,
+        text: normalized
+      });
+      continue;
+    }
+    if (normalized.length >= 35 && normalized.length <= 220 && !normalized.startsWith("status:")) {
+      statements.push(normalized);
+    }
   }
-  return seeds;
-}
-function buildStatementSeeds(lines) {
-  const seeds = [];
-  for (const rawLine of lines) {
-    const line = normalizeSentence(rawLine);
-    if (!line || line.startsWith("#") || line.startsWith("---") || line.length < 35 || line.length > 180) {
-      continue;
-    }
-    seeds.push({
-      question: "Welche Aussage steht so in der Notiz?",
-      answer: line,
-      explanation: `Diese Kernaussage steht in der Notiz: ${line}`
-    });
+  const issues = [];
+  if (headings.length < 2) {
+    issues.push("wenig klare Abschnittsstruktur");
   }
-  return seeds;
+  if (definitions.length === 0) {
+    issues.push("keine expliziten Definitionen");
+  }
+  if (bulletFacts.length === 0) {
+    issues.push("kaum stichpunktartige Fakten");
+  }
+  if (statements.length === 0) {
+    issues.push("wenige ausformulierte Kernaussagen");
+  }
+  const readinessScore = Math.min(headings.length, 4) * 2 + Math.min(definitions.length, 4) * 3 + Math.min(bulletFacts.length, 6) * 2 + Math.min(statements.length, 4) * 1;
+  return {
+    headings,
+    definitions,
+    bulletFacts,
+    statements,
+    readinessScore,
+    issues
+  };
 }
+
+// ../../packages/shared-core/src/quiz.ts
 function uniqueSeeds(seeds, maxCount = 5) {
   const seen = /* @__PURE__ */ new Set();
   const result = [];
@@ -261,11 +270,23 @@ function uniqueSeeds(seeds, maxCount = 5) {
   return result;
 }
 function extractSeeds(markdown) {
-  const lines = markdown.split(/\r?\n/);
+  const signals = analyzeStudyMaterial(markdown);
   const seeds = [
-    ...buildDefinitionSeeds(lines),
-    ...buildHeadingBulletSeeds(lines),
-    ...buildStatementSeeds(lines)
+    ...signals.definitions.map((entry) => ({
+      question: `Welche Beschreibung passt am besten zu "${entry.term}"?`,
+      answer: entry.description,
+      explanation: `Die Notiz beschreibt "${entry.term}" direkt mit: ${entry.description}`
+    })),
+    ...signals.bulletFacts.filter((entry) => entry.heading).map((entry) => ({
+      question: `Was nennt die Notiz unter "${entry.heading}"?`,
+      answer: entry.text,
+      explanation: `Unter "${entry.heading}" steht in der Notiz: ${entry.text}`
+    })),
+    ...signals.statements.map((entry) => ({
+      question: "Welche Aussage steht so in der Notiz?",
+      answer: entry,
+      explanation: `Diese Kernaussage steht in der Notiz: ${entry}`
+    }))
   ];
   return uniqueSeeds(seeds);
 }
@@ -974,6 +995,10 @@ var PruefungsSimulatorPlugin = class extends import_obsidian2.Plugin {
     let exam = parseExamMarkdown(markdown);
     if (exam.questions.length === 0) {
       const note = parseLearningNote(file.path, originalMarkdown);
+      const signals = analyzeStudyMaterial(originalMarkdown);
+      if (signals.readinessScore < 4) {
+        new import_obsidian2.Notice(`Die Notiz ist fuer lokale Pruefungsfragen noch schwach vorbereitet: ${signals.issues.join(", ")}`);
+      }
       markdown = generateQuizFromMarkdown(note, originalMarkdown);
       exam = parseExamMarkdown(markdown);
     }

@@ -196,6 +196,80 @@ function renderDashboardMarkdown(metrics) {
   return lines.join("\n");
 }
 
+// ../../packages/shared-core/src/study-material.ts
+function cleanInlineMarkdown(text) {
+  return text.replace(/\[\[([^\]]+)\]\]/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1").trim();
+}
+function normalizeSentence(text) {
+  return cleanInlineMarkdown(text).replace(/^[-*]\s+/, "").replace(/\s+/g, " ").trim();
+}
+function analyzeStudyMaterial(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const headings = [];
+  const definitions = [];
+  const bulletFacts = [];
+  const statements = [];
+  let currentHeading = "";
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed === "---") {
+      continue;
+    }
+    if (/^#{1,6}\s+/.test(trimmed)) {
+      const heading = normalizeSentence(trimmed.replace(/^#{1,6}\s+/, ""));
+      if (heading) {
+        headings.push(heading);
+        currentHeading = heading;
+      }
+      continue;
+    }
+    const normalized = normalizeSentence(trimmed);
+    if (!normalized) {
+      continue;
+    }
+    const definitionMatch = normalized.match(/^([^:]{3,80}):\s+(.{10,})$/);
+    if (definitionMatch) {
+      definitions.push({
+        term: definitionMatch[1].trim(),
+        description: definitionMatch[2].trim()
+      });
+      continue;
+    }
+    if (/^[-*]\s+/.test(trimmed)) {
+      bulletFacts.push({
+        heading: currentHeading || void 0,
+        text: normalized
+      });
+      continue;
+    }
+    if (normalized.length >= 35 && normalized.length <= 220 && !normalized.startsWith("status:")) {
+      statements.push(normalized);
+    }
+  }
+  const issues = [];
+  if (headings.length < 2) {
+    issues.push("wenig klare Abschnittsstruktur");
+  }
+  if (definitions.length === 0) {
+    issues.push("keine expliziten Definitionen");
+  }
+  if (bulletFacts.length === 0) {
+    issues.push("kaum stichpunktartige Fakten");
+  }
+  if (statements.length === 0) {
+    issues.push("wenige ausformulierte Kernaussagen");
+  }
+  const readinessScore = Math.min(headings.length, 4) * 2 + Math.min(definitions.length, 4) * 3 + Math.min(bulletFacts.length, 6) * 2 + Math.min(statements.length, 4) * 1;
+  return {
+    headings,
+    definitions,
+    bulletFacts,
+    statements,
+    readinessScore,
+    issues
+  };
+}
+
 // ../../packages/plugin-kit/src/index.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_BASE_SETTINGS = {
@@ -737,9 +811,14 @@ var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
   async generateSnapshot() {
     const scanned = await scanVault(this.app, this.settings.rootFolders);
     const metrics = calculateDashboardMetrics(scanned.map((entry) => entry.note));
+    const readyCount = scanned.filter((entry) => analyzeStudyMaterial(entry.markdown).readinessScore >= 4).length;
     const dataviewApi = getDataviewApi(this, this.settings.useDataview);
     const dataviewHint = dataviewApi ? "\n\n> Dataview erkannt: Live-Abfragen koennen in dieser Snapshot-Note ergaenzt werden.\n" : "\n\n> Dataview nicht aktiv: Snapshot basiert auf sicherem Vault-Scan.\n";
-    const content = `${renderDashboardMarkdown(metrics)}${dataviewHint}`;
+    const content = `${renderDashboardMarkdown(metrics)}
+
+## Materialqualitaet
+- Gut nutzbare Lernnotizen: ${readyCount}
+- Noch duenn strukturierte Notizen: ${metrics.total - readyCount}${dataviewHint}`;
     const path = await writePluginOutput(this.app, this.settings.dashboardFolder, this.settings.snapshotFileName, content);
     noticeSuccess(`Dashboard geschrieben: ${path}`);
   }
