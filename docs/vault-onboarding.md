@@ -102,12 +102,29 @@ Use these files as starting points:
 - [templates/learning-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/learning-note.md)
 - [templates/exercise-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/exercise-note.md)
 - [templates/exam-quiz-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/exam-quiz-note.md)
+- [templates/contact-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/contact-note.md)
+- [templates/report-export-draft.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/report-export-draft.md)
 
 These fit well with:
 
 - Templater
 - QuickAdd
 - Metadata Menu
+
+## Practical operating note
+
+For users in real Ausbildungsbetriebe, one thing should be checked early:
+
+- is Obsidian output accepted as PDF
+- or is the official IHK / BLok portal mandatory
+
+If the portal is mandatory, the sane setup is:
+
+- Obsidian stays the draft and knowledge system
+- reports are cleaned up in a dedicated export note
+- final text gets copied into the official system on a regular cadence
+
+That is usually far less painful than discovering the format constraint right before a deadline.
 
 ## Common mistake
 

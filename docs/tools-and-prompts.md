@@ -12,12 +12,20 @@ These plugins work best when users combine them with a few established Obsidian 
 - `Kanban` for task and progress boards
 - `Calendar` for exam dates and milestones
 - `Obsidian Git` for backup and sync
+- `Canvas` for linking Lernfelder to real projects and business processes
+
+Optional, but useful if the user has installed them:
+
+- `Pandoc Reference` for PDF exports that need to resemble official reporting layouts
+- a dedicated `Spaced Repetition` plugin for flashcard-heavy drilling
+- `Waypoints` for contact and department overviews
 
 If you want ready-to-use files instead of rebuilding setup by hand, use:
 
 - [docs/templater-and-quickadd.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/templater-and-quickadd.md)
 - [integrations/templater](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/templater)
 - [integrations/quickadd](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/quickadd)
+- [docs/real-world-blind-spots.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/real-world-blind-spots.md)
 
 ## Template prompts
 
@@ -116,3 +124,4 @@ Then produce:
 - AI does not replace the markdown source.
 - The plugins do not import PDFs or external databases automatically.
 - A vault with zero YAML can still be scanned, but the outputs will be less useful.
+- Export into IHK or company systems is not magically solved by good markdown. If the user needs PDF or portal output, the export path has to be chosen deliberately.

@@ -176,6 +176,10 @@ Included helpers:
 - a bootstrap script in [scripts/bootstrap_vault.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/bootstrap_vault.py)
 - a release packager in [scripts/package_releases.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/package_releases.py)
 
+For the rougher edges of real apprenticeship work, also see:
+
+- [docs/real-world-blind-spots.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/real-world-blind-spots.md)
+
 ## Maintainer docs
 
 For the repo side of the project:
