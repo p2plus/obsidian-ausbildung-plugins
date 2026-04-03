@@ -1,60 +1,61 @@
 # Roadmap
 
-This is the practical roadmap, not the pitch deck version.
+This is the short version.
 
-The repo already has enough moving parts. The next work should make it easier to install, easier to trust, and harder to break.
+The repo already does enough. The next work should make it steadier in real vaults and easier to use under time pressure.
 
-## Near term
+## Now
 
-### 1. Installation should stop being fiddly
+### 1. Keep the learner flow tight
 
-- keep `scripts/install_plugin.py` working and documented
-- add one-line examples per plugin
-- add a small sanity check after install so users can tell whether they copied the right files
+- keep the `Lernzentrale` as the main entry point
+- keep `Vault Doctor` and `Quick Fixes` boring and reliable
+- keep quiz, review, exam, and planning flows reachable from one place
 
-### 2. Vault onboarding should feel less manual
+### 2. Improve note quality, not feature count
 
-- add a `vault doctor` command that reports missing fields, odd values, and notes that look like they should not be in scope
-- add a bootstrap modal in Obsidian for folder selection and baseline metadata
-- ship a few Templater and QuickAdd snippets that are ready to paste, not just described
+- make local quiz generation better on rough notes
+- improve note feedback when a note is still too thin for quiz or exam use
+- keep non-AI fallbacks honest and usable
 
-### 3. Tier 1 plugins should talk to each other better
+### 3. Support messy real vaults
 
-- weak topics from `pruefungs-simulator` should feed `lernplan-generator`
-- due and overdue review pressure should show up in `lernfortschritt-dashboard`
-- generated quiz quality should influence review priority, not sit in isolation
+- keep folder filters practical
+- make Doctor fixes safer and more targeted
+- avoid hidden assumptions about folder names and perfect YAML
 
-## Mid term
+## Next
 
-### 4. Experimental plugins need fewer caveats
+### 4. Make reporting less annoying
 
-- `quiz-generator-markdown`: add more than one comfortable workflow, not just "generate and inspect"
-- `spaced-repetition-engine`: improve queue controls and note-level history
-- `ausbildungs-analytics-dashboard`: tighten empty-state handling, make exports more useful, and cut UI noise
+- keep the export-draft path simple
+- add a clearer split between portal-copy text and PDF-oriented drafts
+- document the IHK / BLok reality without pretending the repo can solve external portals
 
-### 5. Documentation should feel like it was written after using the repo
+### 5. Strengthen the surroundings
 
-- add "first 10 minutes" setup docs for new users
-- add one realistic example flow for existing vaults
-- add screenshots only after the UI actually deserves screenshots
+- keep QuickAdd, Templater, Dataview, and Canvas starter assets in good shape
+- add only the starter files that people actually reuse
+- do not turn the repo into a pile of half-maintained snippets
 
-### 6. Community maintenance should stop being ad hoc
+### 6. Improve plugin handoffs
 
-- use issue templates that ask for the right failure context
-- keep plugin status honest: stable, usable WIP, or experimental
-- package per-plugin releases so testing is not blocked on local repo knowledge
+- let weak exam results feed planning and review more directly
+- keep analytics useful, not noisy
+- tighten the connection between note quality and next-step suggestions
 
-## Later, if it still feels worth it
+## Later
 
-- a real plugin health page in the repo
-- import helpers for larger note collections
-- more structured quiz formats
-- better release notes per plugin instead of one blob for the whole repo
+- better history per note
+- richer local question types
+- cleaner release packaging per plugin
+- more realistic screenshots once the UI settles
 
-## What is intentionally not first
+## Not the plan
 
-- another half-finished plugin
-- automatic scraping or bundling of study content
-- pretending the repo is a complete vault in a box
+- another plugin just because a topic sounds interesting
+- bundling study content into the repo
+- hard dependencies on half the Obsidian plugin ecosystem
+- pretending the repo is a full apprenticeship system on its own
 
-This project is most useful when it stays honest about its shape: tools around a user's notes, not a replacement for them.
+The repo is most useful when it stays practical: good tools around the user's own notes, not a giant framework that needs babysitting.
