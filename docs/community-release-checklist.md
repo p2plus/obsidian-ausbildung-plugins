@@ -7,14 +7,14 @@ Use this before calling any plugin "ready" in public.
 - `npm run check` passes locally
 - release packaging runs cleanly with `python3 scripts/package_releases.py`
 - onboarding docs still match the repo state
-- plugin list in [README.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/README.md) is current
+- plugin list in [README.md](../README.md) is current
 - no private vault content slipped into commits
 
 ## Per plugin
 
 - `manifest.json` description matches the actual feature set
 - `main.js`, `manifest.json`, and `styles.css` are present after build
-- the plugin can be installed into a clean vault with [scripts/install_plugin.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/install_plugin.py)
+- the plugin can be installed into a clean vault with [scripts/install_plugin.py](../scripts/install_plugin.py)
 - settings save and reload without surprises
 - the core command path works on a small test sample
 - the plugin fails politely when data is missing or malformed

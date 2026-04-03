@@ -37,11 +37,20 @@ The repository includes:
 - onboarding docs, note templates, and a vault bootstrap script
 - install and packaging helpers for local vault use and GitHub releases
 
+The repository can also hold the supporting assets around the plugins:
+
+- note templates
+- export-draft templates
+- canvas starters
+- Dataview snippets
+- onboarding docs for optional companion plugins
+
 What it does not include:
 
 - private vault content
 - personal learning notes
 - scraped training data
+- bundled third-party Obsidian plugins
 
 The example vault is intentionally small and artificial. It exists for reproducible tests and screenshots.
 
@@ -163,26 +172,26 @@ For AI-backed features, also verify:
 
 For a real user workflow, start here:
 
-- [docs/getting-started.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/getting-started.md)
-- [docs/vault-onboarding.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/vault-onboarding.md)
-- [docs/tools-and-prompts.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/tools-and-prompts.md)
-- [docs/templater-and-quickadd.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/templater-and-quickadd.md)
+- [docs/getting-started.md](docs/getting-started.md)
+- [docs/vault-onboarding.md](docs/vault-onboarding.md)
+- [docs/tools-and-prompts.md](docs/tools-and-prompts.md)
+- [docs/templater-and-quickadd.md](docs/templater-and-quickadd.md)
 
 Included helpers:
 
-- note templates in [templates](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates)
-- importable Templater and QuickAdd snippets in [integrations](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations)
-- a local install helper in [scripts/install_plugin.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/install_plugin.py)
-- a bootstrap script in [scripts/bootstrap_vault.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/bootstrap_vault.py)
-- a release packager in [scripts/package_releases.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/package_releases.py)
+- note templates in [templates](templates)
+- importable Templater and QuickAdd snippets in [integrations](integrations)
+- a local install helper in [scripts/install_plugin.py](scripts/install_plugin.py)
+- a bootstrap script in [scripts/bootstrap_vault.py](scripts/bootstrap_vault.py)
+- a release packager in [scripts/package_releases.py](scripts/package_releases.py)
 
 For the rougher edges of real apprenticeship work, also see:
 
-- [docs/real-world-blind-spots.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/real-world-blind-spots.md)
+- [docs/real-world-blind-spots.md](docs/real-world-blind-spots.md)
 
 ## Maintainer docs
 
 For the repo side of the project:
 
-- [docs/roadmap.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/roadmap.md)
-- [docs/community-release-checklist.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/community-release-checklist.md)
+- [docs/roadmap.md](docs/roadmap.md)
+- [docs/community-release-checklist.md](docs/community-release-checklist.md)

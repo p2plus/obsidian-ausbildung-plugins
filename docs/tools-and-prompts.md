@@ -22,10 +22,11 @@ Optional, but useful if the user has installed them:
 
 If you want ready-to-use files instead of rebuilding setup by hand, use:
 
-- [docs/templater-and-quickadd.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/templater-and-quickadd.md)
-- [integrations/templater](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/templater)
-- [integrations/quickadd](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/quickadd)
-- [docs/real-world-blind-spots.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/docs/real-world-blind-spots.md)
+- [docs/templater-and-quickadd.md](templater-and-quickadd.md)
+- [integrations/templater](../integrations/templater)
+- [integrations/quickadd](../integrations/quickadd)
+- [integrations/dataview](../integrations/dataview)
+- [docs/real-world-blind-spots.md](real-world-blind-spots.md)
 
 ## Template prompts
 

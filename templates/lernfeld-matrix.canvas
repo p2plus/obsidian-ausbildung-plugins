@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    { "id": "lf01", "type": "text", "x": 0, "y": 0, "width": 260, "height": 120, "text": "LF01\nBerufsausbildung / Betrieb / Recht\n\nVerlinke hier Schulnotizen und echte Vorgänge aus dem Betrieb." },
+    { "id": "lf02", "type": "text", "x": 320, "y": 0, "width": 260, "height": 120, "text": "LF02\nArbeitsorganisation\n\nWelche Prozesse, Schnittstellen oder ERP-Abläufe passen hier?" },
+    { "id": "lf03", "type": "text", "x": 640, "y": 0, "width": 260, "height": 120, "text": "LF03\nBeschaffung / Lager / Material\n\nWo ist der Bezug zu Einkauf, Disposition oder Logistik?" },
+    { "id": "lf04", "type": "text", "x": 960, "y": 0, "width": 260, "height": 120, "text": "LF04\nWertströme / Leistungserstellung\n\nWelche betrieblichen Projekte oder Kennzahlen gehören hierhin?" },
+    { "id": "lf05", "type": "text", "x": 0, "y": 180, "width": 260, "height": 120, "text": "LF05\nKundenbeziehungsprozesse\n\nAngebot, Auftrag, Reklamation, Service." },
+    { "id": "lf06", "type": "text", "x": 320, "y": 180, "width": 260, "height": 120, "text": "LF06\nMarketing / Vertrieb\n\nWelche realen Kampagnen, Kundensegmente oder Vertriebsroutinen passen?" },
+    { "id": "lf07", "type": "text", "x": 640, "y": 180, "width": 260, "height": 120, "text": "LF07\nPersonalwirtschaft\n\nWas davon ist im Betrieb sichtbar, was nur Theorie?" },
+    { "id": "lf08", "type": "text", "x": 960, "y": 180, "width": 260, "height": 120, "text": "LF08\nJahresabschluss / Bewertung\n\nWelche ERP-Berichte, Buchungslogiken oder Abschlussarbeiten helfen hier?" },
+    { "id": "lf09", "type": "text", "x": 0, "y": 360, "width": 260, "height": 120, "text": "LF09\nFinanzierung / Investition\n\nWelche Fälle aus dem Betrieb machen das greifbar?" },
+    { "id": "lf10", "type": "text", "x": 320, "y": 360, "width": 260, "height": 120, "text": "LF10\nKosten- und Leistungsrechnung\n\nWo tauchen Kalkulation, Nachkalkulation oder Abweichungen real auf?" },
+    { "id": "lf11", "type": "text", "x": 640, "y": 360, "width": 260, "height": 120, "text": "LF11\nUnternehmensstrategie / Controlling\n\nWelche Kennzahlen oder Steuerungsroutinen gibt es im Betrieb?" },
+    { "id": "lf12", "type": "text", "x": 960, "y": 360, "width": 260, "height": 120, "text": "LF12\nProjekt / Fachgespräch\n\nHier die stärksten Transferbeispiele sammeln." }
+  ],
+  "edges": []
+}

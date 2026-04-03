@@ -67,7 +67,7 @@ Then gradually add:
 
 ## Bootstrap workflow
 
-The repo includes [scripts/bootstrap_vault.py](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/scripts/bootstrap_vault.py).
+The repo includes [scripts/bootstrap_vault.py](../scripts/bootstrap_vault.py).
 
 Use it when:
 
@@ -99,11 +99,12 @@ The script:
 
 Use these files as starting points:
 
-- [templates/learning-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/learning-note.md)
-- [templates/exercise-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/exercise-note.md)
-- [templates/exam-quiz-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/exam-quiz-note.md)
-- [templates/contact-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/contact-note.md)
-- [templates/report-export-draft.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/templates/report-export-draft.md)
+- [templates/learning-note.md](../templates/learning-note.md)
+- [templates/exercise-note.md](../templates/exercise-note.md)
+- [templates/exam-quiz-note.md](../templates/exam-quiz-note.md)
+- [templates/contact-note.md](../templates/contact-note.md)
+- [templates/report-export-draft.md](../templates/report-export-draft.md)
+- [templates/lernfeld-matrix.canvas](../templates/lernfeld-matrix.canvas)
 
 These fit well with:
 

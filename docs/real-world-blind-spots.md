@@ -2,6 +2,12 @@
 
 This repo covers a lot of ground inside Obsidian. The rough edges usually appear outside Obsidian: IHK portal rules, Betriebspraxis, and the difference between "good notes" and "exam-ready repetition".
 
+Important boundary:
+
+- this repo can ship templates, snippets, starter assets, and workflows
+- it cannot embed third-party Obsidian plugins like `Pandoc Reference`, `Waypoints`, or a dedicated flashcard plugin
+- those stay optional dependencies the user installs and configures in their own vault
+
 ## 1. IHK export check first, not last
 
 The biggest operational risk is not note quality. It is format acceptance.
@@ -26,6 +32,10 @@ If the user has installed `Pandoc Reference`, it is worth building:
 
 That avoids the classic end-of-month scramble where the content exists but the final format still fights back.
 
+The repo now at least carries a draft-side helper for that path:
+
+- [templates/report-export-draft.md](../templates/report-export-draft.md)
+
 ## 2. Lernfeld matrix for theory-to-practice transfer
 
 In the real Ausbildungsalltag, Berufsschule and Betrieb often drift apart in time.
@@ -47,6 +57,10 @@ Use an Obsidian `Canvas` board:
 
 For someone with a key-user / ERP / production background, this matters even more. Transfer is usually the strongest argument in a Fachgespräch, especially when processes, departments, and handoffs are involved.
 
+The repo can hold the starting asset for that:
+
+- [templates/lernfeld-matrix.canvas](../templates/lernfeld-matrix.canvas)
+
 ## 3. Exam mode needs active recall, not only archives
 
 The repo already helps with review queues, quiz generation, and simulation. That still does not fully replace a frictionless flashcard habit.
@@ -64,6 +78,12 @@ Practical pattern:
 - let this repo handle the bigger learning workflow around it
 
 That division is usually more robust than trying to force one system to do everything.
+
+This repo can support that style, but it does not replace the dedicated plugin. The practical handoff is:
+
+- store the source knowledge here
+- use tags such as `#card` inside the note body
+- let the external repetition plugin handle the high-frequency drilling layer
 
 ## 4. Stakeholder log for real people in the Betrieb
 
@@ -90,6 +110,10 @@ Each note can track:
 
 If the user installs `Waypoints`, that folder becomes much easier to navigate because department overviews stop needing manual maintenance.
 
+The repo can at least hold the note structure for the people side:
+
+- [templates/contact-note.md](../templates/contact-note.md)
+
 ## 5. QuickAdd and Dataview are not optional in practice
 
 Strictly speaking, the repo can run without them.
@@ -105,6 +129,10 @@ Good examples:
 - "create a new exercise note"
 - "which Lernfelder did I not touch this month?"
 - "how many report hours are still missing?"
+
+The repo now also carries starter snippets for the visibility side:
+
+- [integrations/dataview](../integrations/dataview)
 
 That is the difference between a clever setup and a setup people actually keep using on a tired Thursday afternoon.
 

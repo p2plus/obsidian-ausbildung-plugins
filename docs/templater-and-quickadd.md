@@ -8,17 +8,17 @@ If you only read one thing on this page, read this:
 - `exercise-note` is for work you actively solve
 - `quiz-source-note` is for compact input that should later turn into quiz questions
 
-There is also a short overview in [integrations/README.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/README.md).
+There is also a short overview in [integrations/README.md](../integrations/README.md).
 
 ## Templater
 
-Files live in [integrations/templater](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/templater).
+Files live in [integrations/templater](../integrations/templater).
 
 Included:
 
-- [integrations/templater/learning-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/templater/learning-note.md)
-- [integrations/templater/exercise-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/templater/exercise-note.md)
-- [integrations/templater/quiz-source-note.md](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/templater/quiz-source-note.md)
+- [integrations/templater/learning-note.md](../integrations/templater/learning-note.md)
+- [integrations/templater/exercise-note.md](../integrations/templater/exercise-note.md)
+- [integrations/templater/quiz-source-note.md](../integrations/templater/quiz-source-note.md)
 
 What each one is for:
 
@@ -37,13 +37,13 @@ They also now carry a short purpose hint at the top of the note so a user is not
 
 ## QuickAdd
 
-Files live in [integrations/quickadd](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/quickadd).
+Files live in [integrations/quickadd](../integrations/quickadd).
 
 Included:
 
-- [integrations/quickadd/new_learning_note.js](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/quickadd/new_learning_note.js)
-- [integrations/quickadd/new_exercise_note.js](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/quickadd/new_exercise_note.js)
-- [integrations/quickadd/new_quiz_source_note.js](/Users/p2plus/Library/CloudStorage/GoogleDrive-philipp.rudics@gmail.com/Meine%20Ablage/Vault/obsidian-ausbildung-plugins/integrations/quickadd/new_quiz_source_note.js)
+- [integrations/quickadd/new_learning_note.js](../integrations/quickadd/new_learning_note.js)
+- [integrations/quickadd/new_exercise_note.js](../integrations/quickadd/new_exercise_note.js)
+- [integrations/quickadd/new_quiz_source_note.js](../integrations/quickadd/new_quiz_source_note.js)
 
 What each one creates:
 
