@@ -396,7 +396,10 @@ class VaultDoctorModal extends Modal {
   private cardsEl?: HTMLElement;
   private previewEl?: HTMLElement;
   private fixBtn?: HTMLButtonElement;
+  private fixFolderBtn?: HTMLButtonElement;
+  private folderFilter?: HTMLSelectElement;
   private report?: VaultDoctorReport;
+  private selectedFolder = "all";
 
   constructor(app: Plugin["app"], plugin: LernfortschrittDashboardPlugin) {
     super(app);
@@ -417,16 +420,30 @@ class VaultDoctorModal extends Modal {
     const preview = shell.createDiv({ cls: "learning-hub__note-card" });
     this.cardsEl = cards;
     this.previewEl = preview;
+    const filterBar = shell.createDiv({ cls: "dashboard-filters" });
+    const folderFilter = filterBar.createEl("select", { cls: "dashboard-filter" });
+    folderFilter.createEl("option", { value: "all", text: "Alle Ordner" });
+    this.folderFilter = folderFilter;
     const actions = shell.createDiv({ cls: "dashboard-actions" });
     const fixBtn = actions.createEl("button", { text: "Quick fixes anwenden" });
+    const fixFolderBtn = actions.createEl("button", { text: "Ordner fixen" });
     const saveBtn = actions.createEl("button", { cls: "mod-cta", text: "Bericht schreiben" });
     const closeBtn = actions.createEl("button", { text: "Schließen" });
     this.fixBtn = fixBtn;
+    this.fixFolderBtn = fixFolderBtn;
     closeBtn.addEventListener("click", () => this.close());
 
     await this.refreshReport();
 
+    folderFilter.addEventListener("change", () => {
+      this.selectedFolder = folderFilter.value;
+      if (this.previewEl && this.report) {
+        this.renderIssues(this.previewEl, this.report);
+      }
+      this.updateFixButtons();
+    });
     fixBtn.addEventListener("click", () => void this.applyQuickFixes());
+    fixFolderBtn.addEventListener("click", () => void this.applyFolderQuickFixes());
 
     saveBtn.addEventListener("click", async () => {
       const path = await this.plugin.writeDoctorReport();
@@ -442,8 +459,9 @@ class VaultDoctorModal extends Modal {
     }
     this.report = await this.plugin.buildDoctorReport();
     this.renderSummary(this.cardsEl, this.report);
+    this.populateFolderFilter(this.report);
     this.renderIssues(this.previewEl, this.report);
-    this.fixBtn.disabled = !this.report.issues.some((issue) => this.isFixable(issue.code));
+    this.updateFixButtons();
   }
 
   private async applyQuickFixes(): Promise<void> {
@@ -454,6 +472,9 @@ class VaultDoctorModal extends Modal {
     const scanned = await scanVault(this.app, this.plugin.settings.rootFolders);
     let changed = 0;
     for (const entry of scanned) {
+      if (this.selectedFolder !== "all" && !entry.note.folder.startsWith(this.selectedFolder)) {
+        continue;
+      }
       const result = applyVaultDoctorFixes(entry.note, entry.markdown);
       if (result.applied.length > 0 && result.markdown !== entry.markdown) {
         await this.app.vault.modify(entry.file, result.markdown);
@@ -461,6 +482,24 @@ class VaultDoctorModal extends Modal {
       }
     }
     noticeSuccess(changed > 0 ? `${changed} Notizen mit sicheren Quick Fixes aktualisiert.` : "Keine sicheren Quick Fixes gefunden.");
+    await this.refreshReport();
+  }
+
+  private async applyFolderQuickFixes(): Promise<void> {
+    if (!this.fixFolderBtn || this.selectedFolder === "all") {
+      return;
+    }
+    this.fixFolderBtn.disabled = true;
+    const scanned = await scanVault(this.app, [this.selectedFolder]);
+    let changed = 0;
+    for (const entry of scanned) {
+      const result = applyVaultDoctorFixes(entry.note, entry.markdown);
+      if (result.applied.length > 0 && result.markdown !== entry.markdown) {
+        await this.app.vault.modify(entry.file, result.markdown);
+        changed += 1;
+      }
+    }
+    noticeSuccess(changed > 0 ? `${changed} Notizen in ${this.selectedFolder} korrigiert.` : `In ${this.selectedFolder} gab es nichts Sicheres zu reparieren.`);
     await this.refreshReport();
   }
 
@@ -502,22 +541,83 @@ class VaultDoctorModal extends Modal {
 
   private renderIssues(container: HTMLElement, report: VaultDoctorReport): void {
     container.empty();
+    const filteredIssues = report.issues.filter((issue) => this.selectedFolder === "all" || issue.path.startsWith(`${this.selectedFolder}/`) || issue.path === this.selectedFolder);
     container.createDiv({ cls: "learning-hub__eyebrow", text: "Einzelbefunde" });
-    container.createEl("h3", { text: report.issues.length === 0 ? "Sieht sauber aus" : "Wo es gerade hakt" });
-    if (report.issues.length === 0) {
+    container.createEl("h3", { text: filteredIssues.length === 0 ? "Sieht sauber aus" : "Wo es gerade hakt" });
+    if (filteredIssues.length === 0) {
       container.createEl("p", { text: "Keine offensichtlichen Brüche gefunden. Das Material wirkt für die aktuelle Plugin-Logik stabil genug." });
       return;
     }
     const list = container.createDiv({ cls: "learning-hub__doctor-list" });
-    report.issues.slice(0, 20).forEach((issue) => {
+    filteredIssues.slice(0, 20).forEach((issue) => {
       const item = list.createDiv({ cls: `learning-hub__doctor-item learning-hub__doctor-item--${issue.severity}` });
       item.createDiv({ cls: "learning-hub__card-kicker", text: `${issue.severity.toUpperCase()} · ${issue.code}` });
       item.createEl("h4", { text: issue.title });
       item.createEl("p", { text: issue.message });
       item.createEl("small", { text: issue.path });
+      const actions = item.createDiv({ cls: "learning-hub__doctor-actions" });
+      const fixOneBtn = actions.createEl("button", { text: "Diesen Befund fixen" });
+      fixOneBtn.disabled = !this.isFixable(issue.code);
+      fixOneBtn.addEventListener("click", () => void this.applySingleIssueFix(issue.path));
     });
-    if (report.issues.length > 20) {
-      container.createEl("p", { text: `Es gibt noch ${report.issues.length - 20} weitere Befunde. Schreib den Bericht, wenn du alles als Markdown haben willst.` });
+    if (filteredIssues.length > 20) {
+      container.createEl("p", { text: `Es gibt noch ${filteredIssues.length - 20} weitere Befunde. Schreib den Bericht, wenn du alles als Markdown haben willst.` });
     }
+  }
+
+  private populateFolderFilter(report: VaultDoctorReport): void {
+    if (!this.folderFilter) {
+      return;
+    }
+    const previous = this.selectedFolder;
+    this.folderFilter.empty();
+    this.folderFilter.createEl("option", { value: "all", text: "Alle Ordner" });
+    const folders = new Set(
+      report.issues.map((issue) => {
+        const parts = issue.path.split("/");
+        return parts.length > 1 ? parts.slice(0, -1).join("/") : "/";
+      })
+    );
+    [...folders].sort().forEach((folder) => {
+      this.folderFilter!.createEl("option", { value: folder, text: folder });
+    });
+    const nextValue = folders.has(previous) || previous === "all" ? previous : "all";
+    this.selectedFolder = nextValue;
+    this.folderFilter.value = nextValue;
+  }
+
+  private updateFixButtons(): void {
+    if (!this.report) {
+      return;
+    }
+    const relevant = this.report.issues.filter((issue) => (this.selectedFolder === "all" || issue.path.startsWith(`${this.selectedFolder}/`) || issue.path === this.selectedFolder) && this.isFixable(issue.code));
+    if (this.fixBtn) {
+      this.fixBtn.disabled = relevant.length === 0;
+    }
+    if (this.fixFolderBtn) {
+      this.fixFolderBtn.disabled = this.selectedFolder === "all" || relevant.length === 0;
+    }
+  }
+
+  private async applySingleIssueFix(path: string): Promise<void> {
+    const file = this.app.vault.getMarkdownFiles().find((entry) => entry.path === path);
+    if (!file) {
+      new Notice(`Datei nicht gefunden: ${path}`);
+      return;
+    }
+    const markdown = await this.app.vault.cachedRead(file);
+    const note = (await scanVault(this.app, [])).find((entry) => entry.note.path === path)?.note;
+    if (!note) {
+      new Notice(`Notiz konnte nicht geladen werden: ${path}`);
+      return;
+    }
+    const result = applyVaultDoctorFixes(note, markdown);
+    if (result.applied.length === 0 || result.markdown === markdown) {
+      new Notice("Hier gab es keinen sicheren Quick Fix.");
+      return;
+    }
+    await this.app.vault.modify(file, result.markdown);
+    noticeSuccess(`${result.applied.join(", ")}.`);
+    await this.refreshReport();
   }
 }

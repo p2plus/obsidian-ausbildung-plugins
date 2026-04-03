@@ -1403,6 +1403,7 @@ var LiveDashboardModal = class extends import_obsidian2.Modal {
 var VaultDoctorModal = class extends import_obsidian2.Modal {
   constructor(app, plugin) {
     super(app);
+    this.selectedFolder = "all";
     this.plugin = plugin;
   }
   async onOpen() {
@@ -1418,14 +1419,28 @@ var VaultDoctorModal = class extends import_obsidian2.Modal {
     const preview = shell.createDiv({ cls: "learning-hub__note-card" });
     this.cardsEl = cards;
     this.previewEl = preview;
+    const filterBar = shell.createDiv({ cls: "dashboard-filters" });
+    const folderFilter = filterBar.createEl("select", { cls: "dashboard-filter" });
+    folderFilter.createEl("option", { value: "all", text: "Alle Ordner" });
+    this.folderFilter = folderFilter;
     const actions = shell.createDiv({ cls: "dashboard-actions" });
     const fixBtn = actions.createEl("button", { text: "Quick fixes anwenden" });
+    const fixFolderBtn = actions.createEl("button", { text: "Ordner fixen" });
     const saveBtn = actions.createEl("button", { cls: "mod-cta", text: "Bericht schreiben" });
     const closeBtn = actions.createEl("button", { text: "Schlie\xDFen" });
     this.fixBtn = fixBtn;
+    this.fixFolderBtn = fixFolderBtn;
     closeBtn.addEventListener("click", () => this.close());
     await this.refreshReport();
+    folderFilter.addEventListener("change", () => {
+      this.selectedFolder = folderFilter.value;
+      if (this.previewEl && this.report) {
+        this.renderIssues(this.previewEl, this.report);
+      }
+      this.updateFixButtons();
+    });
     fixBtn.addEventListener("click", () => void this.applyQuickFixes());
+    fixFolderBtn.addEventListener("click", () => void this.applyFolderQuickFixes());
     saveBtn.addEventListener("click", async () => {
       const path = await this.plugin.writeDoctorReport();
       noticeSuccess(`Vault Doctor geschrieben: ${path}`);
@@ -1439,8 +1454,9 @@ var VaultDoctorModal = class extends import_obsidian2.Modal {
     }
     this.report = await this.plugin.buildDoctorReport();
     this.renderSummary(this.cardsEl, this.report);
+    this.populateFolderFilter(this.report);
     this.renderIssues(this.previewEl, this.report);
-    this.fixBtn.disabled = !this.report.issues.some((issue) => this.isFixable(issue.code));
+    this.updateFixButtons();
   }
   async applyQuickFixes() {
     if (!this.fixBtn) {
@@ -1450,6 +1466,9 @@ var VaultDoctorModal = class extends import_obsidian2.Modal {
     const scanned = await scanVault(this.app, this.plugin.settings.rootFolders);
     let changed = 0;
     for (const entry of scanned) {
+      if (this.selectedFolder !== "all" && !entry.note.folder.startsWith(this.selectedFolder)) {
+        continue;
+      }
       const result = applyVaultDoctorFixes(entry.note, entry.markdown);
       if (result.applied.length > 0 && result.markdown !== entry.markdown) {
         await this.app.vault.modify(entry.file, result.markdown);
@@ -1457,6 +1476,23 @@ var VaultDoctorModal = class extends import_obsidian2.Modal {
       }
     }
     noticeSuccess(changed > 0 ? `${changed} Notizen mit sicheren Quick Fixes aktualisiert.` : "Keine sicheren Quick Fixes gefunden.");
+    await this.refreshReport();
+  }
+  async applyFolderQuickFixes() {
+    if (!this.fixFolderBtn || this.selectedFolder === "all") {
+      return;
+    }
+    this.fixFolderBtn.disabled = true;
+    const scanned = await scanVault(this.app, [this.selectedFolder]);
+    let changed = 0;
+    for (const entry of scanned) {
+      const result = applyVaultDoctorFixes(entry.note, entry.markdown);
+      if (result.applied.length > 0 && result.markdown !== entry.markdown) {
+        await this.app.vault.modify(entry.file, result.markdown);
+        changed += 1;
+      }
+    }
+    noticeSuccess(changed > 0 ? `${changed} Notizen in ${this.selectedFolder} korrigiert.` : `In ${this.selectedFolder} gab es nichts Sicheres zu reparieren.`);
     await this.refreshReport();
   }
   isFixable(code) {
@@ -1493,22 +1529,80 @@ var VaultDoctorModal = class extends import_obsidian2.Modal {
   }
   renderIssues(container, report) {
     container.empty();
+    const filteredIssues = report.issues.filter((issue) => this.selectedFolder === "all" || issue.path.startsWith(`${this.selectedFolder}/`) || issue.path === this.selectedFolder);
     container.createDiv({ cls: "learning-hub__eyebrow", text: "Einzelbefunde" });
-    container.createEl("h3", { text: report.issues.length === 0 ? "Sieht sauber aus" : "Wo es gerade hakt" });
-    if (report.issues.length === 0) {
+    container.createEl("h3", { text: filteredIssues.length === 0 ? "Sieht sauber aus" : "Wo es gerade hakt" });
+    if (filteredIssues.length === 0) {
       container.createEl("p", { text: "Keine offensichtlichen Br\xFCche gefunden. Das Material wirkt f\xFCr die aktuelle Plugin-Logik stabil genug." });
       return;
     }
     const list = container.createDiv({ cls: "learning-hub__doctor-list" });
-    report.issues.slice(0, 20).forEach((issue) => {
+    filteredIssues.slice(0, 20).forEach((issue) => {
       const item = list.createDiv({ cls: `learning-hub__doctor-item learning-hub__doctor-item--${issue.severity}` });
       item.createDiv({ cls: "learning-hub__card-kicker", text: `${issue.severity.toUpperCase()} \xB7 ${issue.code}` });
       item.createEl("h4", { text: issue.title });
       item.createEl("p", { text: issue.message });
       item.createEl("small", { text: issue.path });
+      const actions = item.createDiv({ cls: "learning-hub__doctor-actions" });
+      const fixOneBtn = actions.createEl("button", { text: "Diesen Befund fixen" });
+      fixOneBtn.disabled = !this.isFixable(issue.code);
+      fixOneBtn.addEventListener("click", () => void this.applySingleIssueFix(issue.path));
     });
-    if (report.issues.length > 20) {
-      container.createEl("p", { text: `Es gibt noch ${report.issues.length - 20} weitere Befunde. Schreib den Bericht, wenn du alles als Markdown haben willst.` });
+    if (filteredIssues.length > 20) {
+      container.createEl("p", { text: `Es gibt noch ${filteredIssues.length - 20} weitere Befunde. Schreib den Bericht, wenn du alles als Markdown haben willst.` });
     }
+  }
+  populateFolderFilter(report) {
+    if (!this.folderFilter) {
+      return;
+    }
+    const previous = this.selectedFolder;
+    this.folderFilter.empty();
+    this.folderFilter.createEl("option", { value: "all", text: "Alle Ordner" });
+    const folders = new Set(
+      report.issues.map((issue) => {
+        const parts = issue.path.split("/");
+        return parts.length > 1 ? parts.slice(0, -1).join("/") : "/";
+      })
+    );
+    [...folders].sort().forEach((folder) => {
+      this.folderFilter.createEl("option", { value: folder, text: folder });
+    });
+    const nextValue = folders.has(previous) || previous === "all" ? previous : "all";
+    this.selectedFolder = nextValue;
+    this.folderFilter.value = nextValue;
+  }
+  updateFixButtons() {
+    if (!this.report) {
+      return;
+    }
+    const relevant = this.report.issues.filter((issue) => (this.selectedFolder === "all" || issue.path.startsWith(`${this.selectedFolder}/`) || issue.path === this.selectedFolder) && this.isFixable(issue.code));
+    if (this.fixBtn) {
+      this.fixBtn.disabled = relevant.length === 0;
+    }
+    if (this.fixFolderBtn) {
+      this.fixFolderBtn.disabled = this.selectedFolder === "all" || relevant.length === 0;
+    }
+  }
+  async applySingleIssueFix(path) {
+    const file = this.app.vault.getMarkdownFiles().find((entry) => entry.path === path);
+    if (!file) {
+      new import_obsidian2.Notice(`Datei nicht gefunden: ${path}`);
+      return;
+    }
+    const markdown = await this.app.vault.cachedRead(file);
+    const note = (await scanVault(this.app, [])).find((entry) => entry.note.path === path)?.note;
+    if (!note) {
+      new import_obsidian2.Notice(`Notiz konnte nicht geladen werden: ${path}`);
+      return;
+    }
+    const result = applyVaultDoctorFixes(note, markdown);
+    if (result.applied.length === 0 || result.markdown === markdown) {
+      new import_obsidian2.Notice("Hier gab es keinen sicheren Quick Fix.");
+      return;
+    }
+    await this.app.vault.modify(file, result.markdown);
+    noticeSuccess(`${result.applied.join(", ")}.`);
+    await this.refreshReport();
   }
 };
