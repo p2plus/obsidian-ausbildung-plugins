@@ -1,6 +1,7 @@
 export * from "./ai";
 export * from "./analytics";
 export * from "./dashboard";
+export * from "./doctor";
 export * from "./exam";
 export * from "./keywords";
 export * from "./notes";

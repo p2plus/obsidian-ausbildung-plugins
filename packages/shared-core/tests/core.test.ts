@@ -18,6 +18,8 @@ import {
   parseDateOnly,
   parseLearningNote,
   renderDashboardMarkdown,
+  renderVaultDoctorMarkdown,
+  runVaultDoctor,
   safeJsonParseWithRepair,
   updateYamlField
 } from "../src/index";
@@ -70,6 +72,22 @@ describe("shared core", () => {
     expect(hub.activeNote?.title).toBe(demoNote.title);
     expect(hub.recommendations.some((entry) => entry.id === "review-queue")).toBe(true);
     expect(hub.recommendations.some((entry) => entry.id === "quiz-current")).toBe(true);
+  });
+
+  it("finds vault doctor issues", () => {
+    const report = runVaultDoctor([
+      {
+        note: parseLearningNote(
+          "Lernen/roh.md",
+          "# Roh\nEin einzelner Freitextsatz ohne Struktur."
+        ),
+        markdown: "# Roh\nEin einzelner Freitextsatz ohne Struktur."
+      }
+    ]);
+    expect(report.scannedNotes).toBe(1);
+    expect(report.issues.some((issue) => issue.code === "missing-frontmatter")).toBe(true);
+    expect(report.issues.some((issue) => issue.code === "weak-structure")).toBe(true);
+    expect(renderVaultDoctorMarkdown(report)).toContain("Vault Doctor");
   });
 
   it("grades exam attempts", () => {

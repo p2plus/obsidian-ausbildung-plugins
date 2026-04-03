@@ -62,6 +62,7 @@ Useful commands:
 - `Quiz: Aus aktueller Notiz erzeugen`
 - `Reviews: Faellige Wiederholungen generieren`
 - `Lernfortschritt: Snapshot generieren`
+- `Dashboard: Vault Doctor`
 - `Lernplan: Plan generieren`
 
 ## Minimal front matter

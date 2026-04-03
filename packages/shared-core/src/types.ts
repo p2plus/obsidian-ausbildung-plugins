@@ -74,6 +74,36 @@ export interface LearningHubState {
   recommendations: StudyActionRecommendation[];
 }
 
+export interface VaultDoctorIssue {
+  path: string;
+  title: string;
+  severity: "error" | "warning" | "info";
+  code:
+    | "missing-frontmatter"
+    | "missing-lernstatus"
+    | "missing-lerntyp"
+    | "missing-ausbildungsjahr"
+    | "missing-pruefungsrelevanz"
+    | "invalid-lernstatus"
+    | "invalid-lerntyp"
+    | "invalid-pruefungsrelevanz"
+    | "invalid-ausbildungsjahr"
+    | "invalid-review-date"
+    | "review-order"
+    | "invalid-score"
+    | "invalid-time-estimate"
+    | "module-unsorted"
+    | "weak-structure";
+  message: string;
+}
+
+export interface VaultDoctorReport {
+  scannedNotes: number;
+  issues: VaultDoctorIssue[];
+  bySeverity: Record<"error" | "warning" | "info", number>;
+  byCode: Record<string, number>;
+}
+
 export interface ExamQuestion {
   id: string;
   prompt: string;

@@ -362,6 +362,125 @@ function dedupeRecommendations(recommendations) {
   }).sort((left, right) => order[left.emphasis] - order[right.emphasis]);
 }
 
+// ../../packages/shared-core/src/doctor.ts
+var VALID_LERNSTATUS = /* @__PURE__ */ new Set(["neu", "gelesen", "geuebt", "sicher", "beherrscht"]);
+var VALID_LERNTYP = /* @__PURE__ */ new Set(["theorie", "uebung", "quiz", "pruefung", "review"]);
+var VALID_PRUEFUNGSRELEVANZ = /* @__PURE__ */ new Set(["niedrig", "mittel", "hoch", "ihk-kritisch"]);
+function runVaultDoctor(entries, today = /* @__PURE__ */ new Date()) {
+  const issues = [];
+  for (const entry of entries) {
+    const { note, markdown } = entry;
+    const frontmatter = parseFrontmatter(markdown);
+    const signals = analyzeStudyMaterial(markdown);
+    if (Object.keys(frontmatter).length === 0) {
+      issues.push(makeIssue(note, "warning", "missing-frontmatter", "Kein Front Matter vorhanden. Die Notiz wird dadurch fuer Lern-Workflows schnell unscharf."));
+    }
+    if (!note.lernstatus) {
+      issues.push(makeIssue(note, "warning", "missing-lernstatus", "lernstatus fehlt. Fortschritt und Wiederholung bleiben dadurch unsauber."));
+    } else if (!VALID_LERNSTATUS.has(note.lernstatus)) {
+      issues.push(makeIssue(note, "error", "invalid-lernstatus", `lernstatus "${note.lernstatus}" ist nicht im erwarteten Schema.`));
+    }
+    if (!note.lerntyp) {
+      issues.push(makeIssue(note, "info", "missing-lerntyp", "lerntyp fehlt. Die Notiz ist damit weniger gut fuer Auswertungen trennbar."));
+    } else if (!VALID_LERNTYP.has(note.lerntyp)) {
+      issues.push(makeIssue(note, "error", "invalid-lerntyp", `lerntyp "${note.lerntyp}" ist nicht im erwarteten Schema.`));
+    }
+    if (!note.ausbildungsjahr) {
+      issues.push(makeIssue(note, "info", "missing-ausbildungsjahr", "ausbildungsjahr fehlt. Jahresfilter und Verlauf bleiben dadurch duenn."));
+    } else if (!/^\d+$/.test(note.ausbildungsjahr)) {
+      issues.push(makeIssue(note, "warning", "invalid-ausbildungsjahr", `ausbildungsjahr "${note.ausbildungsjahr}" sieht nicht nach einer klaren Jahresangabe aus.`));
+    }
+    if (!note.pruefungsrelevanz) {
+      issues.push(makeIssue(note, "info", "missing-pruefungsrelevanz", "pruefungsrelevanz fehlt. Priorisierung wird dadurch schw\xE4cher."));
+    } else if (!VALID_PRUEFUNGSRELEVANZ.has(note.pruefungsrelevanz)) {
+      issues.push(makeIssue(note, "error", "invalid-pruefungsrelevanz", `pruefungsrelevanz "${note.pruefungsrelevanz}" ist nicht im erwarteten Schema.`));
+    }
+    if (note.modul_id === "UNSORTIERT") {
+      issues.push(makeIssue(note, "info", "module-unsorted", "modul_id konnte nicht sinnvoll abgeleitet werden und steht noch auf UNSORTIERT."));
+    }
+    if (note.score_last !== void 0 && (note.score_last < 0 || note.score_last > 100)) {
+      issues.push(makeIssue(note, "error", "invalid-score", `score_last ${note.score_last} liegt ausserhalb von 0 bis 100.`));
+    }
+    if (note.score_best !== void 0 && (note.score_best < 0 || note.score_best > 100)) {
+      issues.push(makeIssue(note, "error", "invalid-score", `score_best ${note.score_best} liegt ausserhalb von 0 bis 100.`));
+    }
+    if (note.time_estimate_min !== void 0 && note.time_estimate_min <= 0) {
+      issues.push(makeIssue(note, "warning", "invalid-time-estimate", `time_estimate_min ${note.time_estimate_min} ist kein brauchbarer Lernwert.`));
+    }
+    const lastReview = note.last_review ? safeDate(note.last_review) : void 0;
+    const nextReview = note.next_review ? safeDate(note.next_review) : void 0;
+    if (note.last_review && !lastReview) {
+      issues.push(makeIssue(note, "error", "invalid-review-date", `last_review "${note.last_review}" ist kein valides YYYY-MM-DD Datum.`));
+    }
+    if (note.next_review && !nextReview) {
+      issues.push(makeIssue(note, "error", "invalid-review-date", `next_review "${note.next_review}" ist kein valides YYYY-MM-DD Datum.`));
+    }
+    if (lastReview && nextReview && nextReview < lastReview) {
+      issues.push(makeIssue(note, "warning", "review-order", "next_review liegt vor last_review. Das sieht nach verdrehten Review-Daten aus."));
+    }
+    if (signals.readinessScore < 4) {
+      const because = signals.issues.length > 0 ? signals.issues.join(", ") : "zu wenig klar strukturierte Fakten";
+      issues.push(makeIssue(note, "info", "weak-structure", `Die Notiz ist fuer Quiz und Pr\xFCfung noch eher roh: ${because}.`));
+    }
+    if (note.next_review && nextReview && nextReview < today && !note.lernstatus) {
+      issues.push(makeIssue(note, "info", "missing-lernstatus", "Die Notiz ist review-faellig, aber ohne lernstatus schwer einzuordnen."));
+    }
+  }
+  const bySeverity = {
+    error: issues.filter((entry) => entry.severity === "error").length,
+    warning: issues.filter((entry) => entry.severity === "warning").length,
+    info: issues.filter((entry) => entry.severity === "info").length
+  };
+  const byCode = {};
+  for (const issue of issues) {
+    byCode[issue.code] = (byCode[issue.code] ?? 0) + 1;
+  }
+  return {
+    scannedNotes: entries.length,
+    issues,
+    bySeverity,
+    byCode
+  };
+}
+function renderVaultDoctorMarkdown(report) {
+  const lines = [
+    "# Vault Doctor",
+    "",
+    `- Gescannte Lernnotizen: ${report.scannedNotes}`,
+    `- Fehler: ${report.bySeverity.error}`,
+    `- Warnungen: ${report.bySeverity.warning}`,
+    `- Hinweise: ${report.bySeverity.info}`,
+    "",
+    "## Haeufige Punkte",
+    ...Object.entries(report.byCode).sort((left, right) => right[1] - left[1]).map(([code, count]) => `- ${code}: ${count}`),
+    "",
+    "## Einzelbefunde",
+    ...report.issues.map((issue) => `- [${issue.severity.toUpperCase()}] [[${issue.title}]] (${issue.code})
+  - ${issue.message}
+  - Pfad: ${issue.path}`)
+  ];
+  if (report.issues.length === 0) {
+    lines.push("- Keine offensichtlichen Probleme gefunden. Das Material wirkt fuer die aktuelle Plugin-Logik sauber genug.");
+  }
+  return lines.join("\n");
+}
+function safeDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  const parsed = parseDateOnly(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+function makeIssue(note, severity, code, message) {
+  return {
+    path: note.path,
+    title: note.title,
+    severity,
+    code,
+    message
+  };
+}
+
 // ../../packages/plugin-kit/src/index.ts
 var import_obsidian = require("obsidian");
 var DEFAULT_BASE_SETTINGS = {
@@ -427,6 +546,14 @@ async function writePluginOutput(app, folderPath, fileName, content) {
     await app.vault.create(path, content);
   }
   return path;
+}
+async function openOutputFile(app, path, newLeaf = false) {
+  const file = app.vault.getAbstractFileByPath(path);
+  if (!(file instanceof import_obsidian.TFile)) {
+    return;
+  }
+  const leaf = app.workspace.getLeaf(newLeaf);
+  await leaf.openFile(file);
 }
 async function updateLearningStatus(app, file, status) {
   const markdown = await app.vault.cachedRead(file);
@@ -866,7 +993,8 @@ var BaseSettingsTab = class extends import_obsidian.PluginSettingTab {
 // src/main.ts
 var DEFAULT_SETTINGS = {
   ...DEFAULT_BASE_SETTINGS,
-  snapshotFileName: "lernfortschritt-dashboard.md"
+  snapshotFileName: "lernfortschritt-dashboard.md",
+  doctorFileName: "vault-doctor.md"
 };
 var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
   async onload() {
@@ -892,6 +1020,11 @@ var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
       name: "Dashboard: Lernzentrale \xF6ffnen",
       callback: () => void this.openLiveDashboard()
     });
+    this.addCommand({
+      id: "run-vault-doctor",
+      name: "Dashboard: Vault Doctor",
+      callback: () => void this.openVaultDoctor()
+    });
     this.addSettingTab(new BaseSettingsTab(this.app, this));
   }
   async loadSettings() {
@@ -914,6 +1047,20 @@ var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
     const path = await writePluginOutput(this.app, this.settings.dashboardFolder, this.settings.snapshotFileName, content);
     noticeSuccess(`Dashboard geschrieben: ${path}`);
   }
+  async buildDoctorReport() {
+    const scanned = await scanVault(this.app, this.settings.rootFolders);
+    return runVaultDoctor(scanned.map((entry) => ({ note: entry.note, markdown: entry.markdown })));
+  }
+  async writeDoctorReport() {
+    const report = await this.buildDoctorReport();
+    const path = await writePluginOutput(
+      this.app,
+      this.settings.dashboardFolder,
+      this.settings.doctorFileName,
+      renderVaultDoctorMarkdown(report)
+    );
+    return path;
+  }
   async markCurrent(status) {
     const file = this.app.workspace.getActiveFile();
     if (!file) {
@@ -925,6 +1072,9 @@ var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
   }
   openLiveDashboard() {
     new LiveDashboardModal(this.app, this).open();
+  }
+  openVaultDoctor() {
+    new VaultDoctorModal(this.app, this).open();
   }
 };
 var LiveDashboardModal = class extends import_obsidian2.Modal {
@@ -953,6 +1103,7 @@ var LiveDashboardModal = class extends import_obsidian2.Modal {
     const snapshotBtn = actions.createEl("button", { text: "Snapshot schreiben" });
     const reviewBtn = actions.createEl("button", { cls: "mod-cta", text: "Review Queue" });
     const planBtn = actions.createEl("button", { text: "Lernplan" });
+    const doctorBtn = actions.createEl("button", { text: "Vault Doctor" });
     const closeBtn = actions.createEl("button", { text: "Schlie\xDFen" });
     await this.loadHubState();
     this.renderFilters(yearFilter);
@@ -968,6 +1119,10 @@ var LiveDashboardModal = class extends import_obsidian2.Modal {
     });
     reviewBtn.addEventListener("click", () => void this.runCommand("spaced-repetition-engine:preview-review-queue"));
     planBtn.addEventListener("click", () => void this.runCommand("lernplan-generator:preview-study-plan"));
+    doctorBtn.addEventListener("click", () => {
+      this.close();
+      new VaultDoctorModal(this.app, this.plugin).open();
+    });
     closeBtn.addEventListener("click", () => this.close());
   }
   async loadHubState() {
@@ -1160,5 +1315,73 @@ var LiveDashboardModal = class extends import_obsidian2.Modal {
     const bar = container.createDiv({ cls: "mini-progress-bar" });
     const fill = bar.createDiv({ cls: "mini-progress-fill" });
     fill.style.width = `${Math.max(0, Math.min(percentage, 100))}%`;
+  }
+};
+var VaultDoctorModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  async onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    const shell = contentEl.createDiv({ cls: "live-dashboard-modal" });
+    const header = shell.createDiv({ cls: "dashboard-header" });
+    header.createEl("h2", { text: "Vault Doctor" });
+    header.createEl("p", {
+      text: "Kein Orakel, nur ein n\xFCchterner Blick auf Metadaten, Review-Daten und Notizstruktur."
+    });
+    const cards = shell.createDiv({ cls: "dashboard-charts" });
+    const preview = shell.createDiv({ cls: "learning-hub__note-card" });
+    const actions = shell.createDiv({ cls: "dashboard-actions" });
+    const saveBtn = actions.createEl("button", { cls: "mod-cta", text: "Bericht schreiben" });
+    const closeBtn = actions.createEl("button", { text: "Schlie\xDFen" });
+    closeBtn.addEventListener("click", () => this.close());
+    const report = await this.plugin.buildDoctorReport();
+    this.renderSummary(cards, report);
+    this.renderIssues(preview, report);
+    saveBtn.addEventListener("click", async () => {
+      const path = await this.plugin.writeDoctorReport();
+      noticeSuccess(`Vault Doctor geschrieben: ${path}`);
+      await openOutputFile(this.app, path, true);
+      this.close();
+    });
+  }
+  renderSummary(container, report) {
+    const scanned = container.createDiv({ cls: "chart-card" });
+    scanned.createEl("h3", { text: "\xDCberblick" });
+    scanned.createEl("p", { text: `${report.scannedNotes} Lernnotizen gescannt` });
+    const errors = container.createDiv({ cls: "chart-card" });
+    errors.createEl("h3", { text: "Problemdruck" });
+    errors.createEl("p", { text: `${report.bySeverity.error} Fehler, ${report.bySeverity.warning} Warnungen, ${report.bySeverity.info} Hinweise` });
+    const top = container.createDiv({ cls: "chart-card" });
+    top.createEl("h3", { text: "Was gerade am h\xE4ufigsten auff\xE4llt" });
+    const list = top.createEl("ul", { cls: "learning-hub__issues" });
+    const topCodes = Object.entries(report.byCode).sort((left, right) => right[1] - left[1]).slice(0, 5);
+    if (topCodes.length === 0) {
+      list.createEl("li", { text: "Nichts Auff\xE4lliges gefunden." });
+      return;
+    }
+    topCodes.forEach(([code, count]) => list.createEl("li", { text: `${code}: ${count}` }));
+  }
+  renderIssues(container, report) {
+    container.empty();
+    container.createDiv({ cls: "learning-hub__eyebrow", text: "Einzelbefunde" });
+    container.createEl("h3", { text: report.issues.length === 0 ? "Sieht sauber aus" : "Wo es gerade hakt" });
+    if (report.issues.length === 0) {
+      container.createEl("p", { text: "Keine offensichtlichen Br\xFCche gefunden. Das Material wirkt f\xFCr die aktuelle Plugin-Logik stabil genug." });
+      return;
+    }
+    const list = container.createDiv({ cls: "learning-hub__doctor-list" });
+    report.issues.slice(0, 20).forEach((issue) => {
+      const item = list.createDiv({ cls: `learning-hub__doctor-item learning-hub__doctor-item--${issue.severity}` });
+      item.createDiv({ cls: "learning-hub__card-kicker", text: `${issue.severity.toUpperCase()} \xB7 ${issue.code}` });
+      item.createEl("h4", { text: issue.title });
+      item.createEl("p", { text: issue.message });
+      item.createEl("small", { text: issue.path });
+    });
+    if (report.issues.length > 20) {
+      container.createEl("p", { text: `Es gibt noch ${report.issues.length - 20} weitere Befunde. Schreib den Bericht, wenn du alles als Markdown haben willst.` });
+    }
   }
 };

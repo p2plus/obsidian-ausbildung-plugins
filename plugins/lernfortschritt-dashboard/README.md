@@ -19,6 +19,7 @@ flowchart LR
 ## What it does well
 
 - gives you a proper `Lernzentrale` instead of just another report button
+- includes a built-in `Vault Doctor` for rough edges in metadata, review dates, and note structure
 - counts progress by `lernstatus` and `ausbildungsjahr`
 - highlights weak modules based on recorded scores
 - shows due reviews without forcing a separate review system
@@ -37,6 +38,7 @@ flowchart LR
 - start with the recommended next action instead of guessing which plugin to open
 - use the current-note panel to see whether the open note is quiz-ready or still too raw
 - drop into `Quiz`, `Prüfung`, `Review Queue`, or `Lernplan` directly from there
+- run `Vault Doctor` when a vault feels noisy, inconsistent, or oddly unhelpful
 
 ## Manual QA
 
@@ -44,6 +46,7 @@ flowchart LR
 - click the dashboard ribbon icon and verify the `Lernzentrale` opens
 - open a real learning note and confirm the current-note panel reacts to it
 - trigger `Review Queue`, `Quiz`, and `Lernplan` from the dashboard modal
+- open `Vault Doctor` and verify that obvious metadata gaps are called out
 - run `Dashboard: Snapshot generieren`
 - open the generated file and verify totals, years, and weak modules
 - run `Dashboard: Aktuelle Notiz als geuebt markieren`

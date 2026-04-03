@@ -1,14 +1,16 @@
 import { Modal, Notice, Plugin } from "obsidian";
-import { analyzeStudyMaterial, buildLearningHubState, calculateDashboardMetrics, LearningHubState, renderDashboardMarkdown } from "@ausbildung/shared-core";
-import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getDataviewApi, noticeSuccess, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
+import { analyzeStudyMaterial, buildLearningHubState, calculateDashboardMetrics, LearningHubState, renderDashboardMarkdown, renderVaultDoctorMarkdown, runVaultDoctor, VaultDoctorReport } from "@ausbildung/shared-core";
+import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getDataviewApi, noticeSuccess, openOutputFile, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface DashboardSettings extends BasePluginSettings {
   snapshotFileName: string;
+  doctorFileName: string;
 }
 
 const DEFAULT_SETTINGS: DashboardSettings = {
   ...DEFAULT_BASE_SETTINGS,
-  snapshotFileName: "lernfortschritt-dashboard.md"
+  snapshotFileName: "lernfortschritt-dashboard.md",
+  doctorFileName: "vault-doctor.md"
 };
 
 type ScanResult = Awaited<ReturnType<typeof scanVault>>[number];
@@ -39,6 +41,11 @@ export default class LernfortschrittDashboardPlugin extends Plugin {
       name: "Dashboard: Lernzentrale öffnen",
       callback: () => void this.openLiveDashboard()
     });
+    this.addCommand({
+      id: "run-vault-doctor",
+      name: "Dashboard: Vault Doctor",
+      callback: () => void this.openVaultDoctor()
+    });
     this.addSettingTab(new BaseSettingsTab(this.app, this));
   }
 
@@ -63,6 +70,22 @@ export default class LernfortschrittDashboardPlugin extends Plugin {
     noticeSuccess(`Dashboard geschrieben: ${path}`);
   }
 
+  async buildDoctorReport(): Promise<VaultDoctorReport> {
+    const scanned = await scanVault(this.app, this.settings.rootFolders);
+    return runVaultDoctor(scanned.map((entry) => ({ note: entry.note, markdown: entry.markdown })));
+  }
+
+  async writeDoctorReport(): Promise<string> {
+    const report = await this.buildDoctorReport();
+    const path = await writePluginOutput(
+      this.app,
+      this.settings.dashboardFolder,
+      this.settings.doctorFileName,
+      renderVaultDoctorMarkdown(report)
+    );
+    return path;
+  }
+
   private async markCurrent(status: string): Promise<void> {
     const file = this.app.workspace.getActiveFile();
     if (!file) {
@@ -75,6 +98,10 @@ export default class LernfortschrittDashboardPlugin extends Plugin {
 
   private openLiveDashboard(): void {
     new LiveDashboardModal(this.app, this).open();
+  }
+
+  private openVaultDoctor(): void {
+    new VaultDoctorModal(this.app, this).open();
   }
 }
 
@@ -112,6 +139,7 @@ class LiveDashboardModal extends Modal {
     const snapshotBtn = actions.createEl("button", { text: "Snapshot schreiben" });
     const reviewBtn = actions.createEl("button", { cls: "mod-cta", text: "Review Queue" });
     const planBtn = actions.createEl("button", { text: "Lernplan" });
+    const doctorBtn = actions.createEl("button", { text: "Vault Doctor" });
     const closeBtn = actions.createEl("button", { text: "Schließen" });
 
     await this.loadHubState();
@@ -130,6 +158,10 @@ class LiveDashboardModal extends Modal {
     });
     reviewBtn.addEventListener("click", () => void this.runCommand("spaced-repetition-engine:preview-review-queue"));
     planBtn.addEventListener("click", () => void this.runCommand("lernplan-generator:preview-study-plan"));
+    doctorBtn.addEventListener("click", () => {
+      this.close();
+      new VaultDoctorModal(this.app, this.plugin).open();
+    });
     closeBtn.addEventListener("click", () => this.close());
   }
 
@@ -356,5 +388,84 @@ class LiveDashboardModal extends Modal {
     const bar = container.createDiv({ cls: "mini-progress-bar" });
     const fill = bar.createDiv({ cls: "mini-progress-fill" });
     fill.style.width = `${Math.max(0, Math.min(percentage, 100))}%`;
+  }
+}
+
+class VaultDoctorModal extends Modal {
+  private plugin: LernfortschrittDashboardPlugin;
+
+  constructor(app: Plugin["app"], plugin: LernfortschrittDashboardPlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  async onOpen(): Promise<void> {
+    const { contentEl } = this;
+    contentEl.empty();
+    const shell = contentEl.createDiv({ cls: "live-dashboard-modal" });
+    const header = shell.createDiv({ cls: "dashboard-header" });
+    header.createEl("h2", { text: "Vault Doctor" });
+    header.createEl("p", {
+      text: "Kein Orakel, nur ein nüchterner Blick auf Metadaten, Review-Daten und Notizstruktur."
+    });
+
+    const cards = shell.createDiv({ cls: "dashboard-charts" });
+    const preview = shell.createDiv({ cls: "learning-hub__note-card" });
+    const actions = shell.createDiv({ cls: "dashboard-actions" });
+    const saveBtn = actions.createEl("button", { cls: "mod-cta", text: "Bericht schreiben" });
+    const closeBtn = actions.createEl("button", { text: "Schließen" });
+    closeBtn.addEventListener("click", () => this.close());
+
+    const report = await this.plugin.buildDoctorReport();
+    this.renderSummary(cards, report);
+    this.renderIssues(preview, report);
+
+    saveBtn.addEventListener("click", async () => {
+      const path = await this.plugin.writeDoctorReport();
+      noticeSuccess(`Vault Doctor geschrieben: ${path}`);
+      await openOutputFile(this.app, path, true);
+      this.close();
+    });
+  }
+
+  private renderSummary(container: HTMLElement, report: VaultDoctorReport): void {
+    const scanned = container.createDiv({ cls: "chart-card" });
+    scanned.createEl("h3", { text: "Überblick" });
+    scanned.createEl("p", { text: `${report.scannedNotes} Lernnotizen gescannt` });
+
+    const errors = container.createDiv({ cls: "chart-card" });
+    errors.createEl("h3", { text: "Problemdruck" });
+    errors.createEl("p", { text: `${report.bySeverity.error} Fehler, ${report.bySeverity.warning} Warnungen, ${report.bySeverity.info} Hinweise` });
+
+    const top = container.createDiv({ cls: "chart-card" });
+    top.createEl("h3", { text: "Was gerade am häufigsten auffällt" });
+    const list = top.createEl("ul", { cls: "learning-hub__issues" });
+    const topCodes = Object.entries(report.byCode).sort((left, right) => right[1] - left[1]).slice(0, 5);
+    if (topCodes.length === 0) {
+      list.createEl("li", { text: "Nichts Auffälliges gefunden." });
+      return;
+    }
+    topCodes.forEach(([code, count]) => list.createEl("li", { text: `${code}: ${count}` }));
+  }
+
+  private renderIssues(container: HTMLElement, report: VaultDoctorReport): void {
+    container.empty();
+    container.createDiv({ cls: "learning-hub__eyebrow", text: "Einzelbefunde" });
+    container.createEl("h3", { text: report.issues.length === 0 ? "Sieht sauber aus" : "Wo es gerade hakt" });
+    if (report.issues.length === 0) {
+      container.createEl("p", { text: "Keine offensichtlichen Brüche gefunden. Das Material wirkt für die aktuelle Plugin-Logik stabil genug." });
+      return;
+    }
+    const list = container.createDiv({ cls: "learning-hub__doctor-list" });
+    report.issues.slice(0, 20).forEach((issue) => {
+      const item = list.createDiv({ cls: `learning-hub__doctor-item learning-hub__doctor-item--${issue.severity}` });
+      item.createDiv({ cls: "learning-hub__card-kicker", text: `${issue.severity.toUpperCase()} · ${issue.code}` });
+      item.createEl("h4", { text: issue.title });
+      item.createEl("p", { text: issue.message });
+      item.createEl("small", { text: issue.path });
+    });
+    if (report.issues.length > 20) {
+      container.createEl("p", { text: `Es gibt noch ${report.issues.length - 20} weitere Befunde. Schreib den Bericht, wenn du alles als Markdown haben willst.` });
+    }
   }
 }

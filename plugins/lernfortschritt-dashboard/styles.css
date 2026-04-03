@@ -154,6 +154,46 @@
   margin-top: 1rem;
 }
 
+.learning-hub__doctor-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.learning-hub__doctor-item {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  padding: 0.85rem 0.95rem;
+  background: var(--background-primary-alt);
+}
+
+.learning-hub__doctor-item h4 {
+  margin: 0 0 0.35rem;
+}
+
+.learning-hub__doctor-item p,
+.learning-hub__doctor-item small {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.learning-hub__doctor-item small {
+  display: block;
+  margin-top: 0.45rem;
+}
+
+.learning-hub__doctor-item--error {
+  border-color: color-mix(in srgb, #b24a3f 60%, var(--background-modifier-border));
+}
+
+.learning-hub__doctor-item--warning {
+  border-color: color-mix(in srgb, #d97706 55%, var(--background-modifier-border));
+}
+
+.learning-hub__doctor-item--info {
+  border-color: color-mix(in srgb, #3f6bb2 45%, var(--background-modifier-border));
+}
+
 .dashboard-charts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
