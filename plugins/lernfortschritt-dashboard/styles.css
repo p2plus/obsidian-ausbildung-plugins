@@ -3,87 +3,224 @@
 }
 
 .live-dashboard-modal {
-  min-width: 700px;
-  min-height: 600px;
+  min-width: 860px;
+  max-width: 1100px;
+  min-height: 680px;
 }
 
 .dashboard-header {
   margin-bottom: 1rem;
 }
 
+.dashboard-header h2 {
+  margin-bottom: 0.35rem;
+}
+
+.dashboard-header p {
+  margin: 0;
+  color: var(--text-muted);
+  max-width: 70ch;
+}
+
 .dashboard-filters {
+  display: flex;
+  justify-content: flex-end;
   margin-bottom: 1rem;
 }
 
 .dashboard-filter {
-  padding: 0.5rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--background-secondary);
+}
+
+.learning-hub {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.learning-hub__hero-card,
+.learning-hub__note-card,
+.learning-hub__card,
+.chart-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--background-secondary) 94%, white 6%), var(--background-secondary));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.learning-hub__recommendations {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.learning-hub__hero-card {
+  padding: 1rem 1.1rem;
+}
+
+.learning-hub__eyebrow,
+.learning-hub__card-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 0.45rem;
+}
+
+.learning-hub__hero-card h3,
+.learning-hub__note-card h3,
+.learning-hub__card h4 {
+  margin: 0 0 0.45rem;
+}
+
+.learning-hub__hero-card p,
+.learning-hub__note-card p,
+.learning-hub__card p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.learning-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.learning-hub__card {
+  padding: 1rem;
+}
+
+.learning-hub__card button {
+  margin-top: 0.85rem;
+}
+
+.learning-hub__card--urgent {
+  border-color: color-mix(in srgb, #b24a3f 60%, var(--background-modifier-border));
+}
+
+.learning-hub__card--next {
+  border-color: color-mix(in srgb, #2f7d61 45%, var(--background-modifier-border));
+}
+
+.learning-hub__card--steady {
+  border-color: color-mix(in srgb, #7d5a2f 40%, var(--background-modifier-border));
+}
+
+.learning-hub__current-note {
+  display: flex;
+}
+
+.learning-hub__note-card {
+  width: 100%;
+  padding: 1rem 1.1rem;
+}
+
+.learning-hub__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.85rem 0;
+}
+
+.learning-hub__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: var(--background-primary-alt);
+  color: var(--text-normal);
+  font-size: 0.82rem;
+}
+
+.learning-hub__chip--urgent {
+  background: color-mix(in srgb, #b24a3f 18%, var(--background-primary-alt));
+}
+
+.learning-hub__issues {
+  margin: 0.85rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--text-muted);
+}
+
+.learning-hub__note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
 }
 
 .dashboard-charts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
   margin-bottom: 1rem;
 }
 
 .chart-card {
   padding: 1rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  background: var(--background-secondary);
+}
+
+.chart-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.8rem;
+}
+
+.chart-card__meta {
+  margin-top: 0.75rem;
+  color: var(--text-muted);
 }
 
 .pie-chart {
   position: relative;
   width: 150px;
   height: 150px;
+  margin: 0 auto 1rem;
   border-radius: 50%;
-  margin: 0 auto;
   overflow: hidden;
+  background: var(--background-modifier-border);
 }
 
 .pie-segment {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+  inset: 0;
+  transform-origin: center;
 }
 
-.pie-label {
-  margin-top: 1rem;
-  font-size: 0.8rem;
+.pie-legend {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.pie-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+}
+
+.pie-legend__swatch {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 999px;
 }
 
 .progress-bar {
   width: 100%;
-  height: 20px;
+  height: 16px;
   background: var(--background-modifier-border);
-  border-radius: 10px;
+  border-radius: 999px;
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
 
 .progress-fill {
   height: 100%;
-  background: #2f7d61;
-  transition: width 0.3s;
-}
-
-.mini-progress-bar {
-  width: 100px;
-  height: 10px;
-  background: var(--background-modifier-border);
-  border-radius: 5px;
-  overflow: hidden;
-  margin-left: 1rem;
-}
-
-.mini-progress-fill {
-  height: 100%;
-  background: #d97706;
+  background: linear-gradient(90deg, #2f7d61, #57a37b);
   transition: width 0.3s;
 }
 
@@ -91,23 +228,34 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.mini-progress-bar {
+  width: 110px;
+  height: 10px;
+  background: var(--background-modifier-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.mini-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d97706, #efb154);
+  transition: width 0.3s;
 }
 
 .celebration {
-  grid-column: span 2;
-  padding: 1rem;
+  grid-column: 1 / -1;
+  padding: 1rem 1.1rem;
   background: linear-gradient(135deg, #2f7d61, #7d5a2f);
   color: white;
-  border-radius: 8px;
-  text-align: center;
-  animation: celebrate 1s ease-in-out;
+  border-radius: 16px;
 }
 
-@keyframes celebrate {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+.celebration p {
+  margin: 0;
 }
 
 .dashboard-actions {
@@ -116,3 +264,16 @@
   gap: 0.75rem;
 }
 
+@media (max-width: 900px) {
+  .live-dashboard-modal {
+    min-width: 100%;
+  }
+
+  .learning-hub {
+    grid-template-columns: 1fr;
+  }
+
+  .learning-hub__grid {
+    grid-template-columns: 1fr;
+  }
+}

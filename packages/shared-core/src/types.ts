@@ -48,6 +48,32 @@ export interface DashboardMetrics {
   dueReviews: number;
 }
 
+export interface StudyActionRecommendation {
+  id: "review-queue" | "quiz-current" | "simulate-current" | "plan-week" | "snapshot";
+  title: string;
+  reason: string;
+  emphasis: "urgent" | "next" | "steady";
+  cta: string;
+}
+
+export interface LearningHubState {
+  metrics: DashboardMetrics;
+  usableStudyNotes: number;
+  weaklyStructuredNotes: number;
+  weakestModule?: { modulId: string; averageScore: number; count: number };
+  dueReviewTitles: string[];
+  activeNote?: {
+    path: string;
+    title: string;
+    readinessScore: number;
+    issues: string[];
+    lernstatus?: string;
+    dueReview: boolean;
+    moduleId?: string;
+  };
+  recommendations: StudyActionRecommendation[];
+}
+
 export interface ExamQuestion {
   id: string;
   prompt: string;

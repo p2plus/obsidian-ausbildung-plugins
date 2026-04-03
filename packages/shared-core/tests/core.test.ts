@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAnalyticsAiRequest,
+  buildLearningHubState,
   analyzeStudyMaterial,
   buildKeywordGapAiRequest,
   buildQuizAiRequest,
@@ -53,6 +54,22 @@ describe("shared core", () => {
     expect(metrics.total).toBe(1);
     expect(metrics.dueReviews).toBe(1);
     expect(renderDashboardMarkdown(metrics)).toContain("Lernfortschritt Dashboard");
+  });
+
+  it("builds learner-centered hub recommendations", () => {
+    const hub = buildLearningHubState(
+      [demoNote],
+      [{
+        path: demoNote.path,
+        markdown: "# Demo\n## Thema\n- Punkt A\n- Punkt B\n\nBegriff: Eine saubere Definition fuer die Pruefung."
+      }],
+      demoNote.path,
+      new Date("2026-03-30T00:00:00Z")
+    );
+    expect(hub.usableStudyNotes).toBe(1);
+    expect(hub.activeNote?.title).toBe(demoNote.title);
+    expect(hub.recommendations.some((entry) => entry.id === "review-queue")).toBe(true);
+    expect(hub.recommendations.some((entry) => entry.id === "quiz-current")).toBe(true);
   });
 
   it("grades exam attempts", () => {

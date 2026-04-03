@@ -144,58 +144,6 @@ function parseDateOnly(dateText) {
   return /* @__PURE__ */ new Date(`${dateText}T12:00:00`);
 }
 
-// ../../packages/shared-core/src/dashboard.ts
-function calculateDashboardMetrics(notes, today = /* @__PURE__ */ new Date()) {
-  const byStatus = {};
-  const byYear = {};
-  const weakModules = /* @__PURE__ */ new Map();
-  let dueReviews = 0;
-  for (const note of notes) {
-    const statusKey = note.lernstatus ?? note.status ?? "unbekannt";
-    const yearKey = note.ausbildungsjahr ?? "ohne-jahr";
-    byStatus[statusKey] = (byStatus[statusKey] ?? 0) + 1;
-    byYear[yearKey] = (byYear[yearKey] ?? 0) + 1;
-    if (typeof note.score_last === "number" && note.modul_id) {
-      const current = weakModules.get(note.modul_id) ?? { total: 0, count: 0 };
-      current.total += note.score_last;
-      current.count += 1;
-      weakModules.set(note.modul_id, current);
-    }
-    if (note.next_review && parseDateOnly(note.next_review) <= today) {
-      dueReviews += 1;
-    }
-  }
-  return {
-    total: notes.length,
-    byStatus,
-    byYear,
-    dueReviews,
-    weakModules: [...weakModules.entries()].map(([modulId, value]) => ({
-      modulId,
-      averageScore: Math.round(value.total / value.count),
-      count: value.count
-    })).sort((left, right) => left.averageScore - right.averageScore).slice(0, 5)
-  };
-}
-function renderDashboardMarkdown(metrics) {
-  const lines = [
-    "# Lernfortschritt Dashboard",
-    "",
-    `- Notizen gesamt: ${metrics.total}`,
-    `- F\xE4llige Reviews: ${metrics.dueReviews}`,
-    "",
-    "## Status",
-    ...Object.entries(metrics.byStatus).map(([key, value]) => `- ${key}: ${value}`),
-    "",
-    "## Ausbildungsjahre",
-    ...Object.entries(metrics.byYear).map(([key, value]) => `- ${key}: ${value}`),
-    "",
-    "## Schwaechste Module",
-    ...metrics.weakModules.map((item) => `- ${item.modulId}: ${item.averageScore}% aus ${item.count} Notizen`)
-  ];
-  return lines.join("\n");
-}
-
 // ../../packages/shared-core/src/study-material.ts
 function cleanInlineMarkdown(text) {
   return text.replace(/\[\[([^\]]+)\]\]/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1").trim();
@@ -268,6 +216,150 @@ function analyzeStudyMaterial(markdown) {
     readinessScore,
     issues
   };
+}
+
+// ../../packages/shared-core/src/dashboard.ts
+function calculateDashboardMetrics(notes, today = /* @__PURE__ */ new Date()) {
+  const byStatus = {};
+  const byYear = {};
+  const weakModules = /* @__PURE__ */ new Map();
+  let dueReviews = 0;
+  for (const note of notes) {
+    const statusKey = note.lernstatus ?? note.status ?? "unbekannt";
+    const yearKey = note.ausbildungsjahr ?? "ohne-jahr";
+    byStatus[statusKey] = (byStatus[statusKey] ?? 0) + 1;
+    byYear[yearKey] = (byYear[yearKey] ?? 0) + 1;
+    if (typeof note.score_last === "number" && note.modul_id) {
+      const current = weakModules.get(note.modul_id) ?? { total: 0, count: 0 };
+      current.total += note.score_last;
+      current.count += 1;
+      weakModules.set(note.modul_id, current);
+    }
+    if (note.next_review && parseDateOnly(note.next_review) <= today) {
+      dueReviews += 1;
+    }
+  }
+  return {
+    total: notes.length,
+    byStatus,
+    byYear,
+    dueReviews,
+    weakModules: [...weakModules.entries()].map(([modulId, value]) => ({
+      modulId,
+      averageScore: Math.round(value.total / value.count),
+      count: value.count
+    })).sort((left, right) => left.averageScore - right.averageScore).slice(0, 5)
+  };
+}
+function renderDashboardMarkdown(metrics) {
+  const lines = [
+    "# Lernfortschritt Dashboard",
+    "",
+    `- Notizen gesamt: ${metrics.total}`,
+    `- F\xE4llige Reviews: ${metrics.dueReviews}`,
+    "",
+    "## Status",
+    ...Object.entries(metrics.byStatus).map(([key, value]) => `- ${key}: ${value}`),
+    "",
+    "## Ausbildungsjahre",
+    ...Object.entries(metrics.byYear).map(([key, value]) => `- ${key}: ${value}`),
+    "",
+    "## Schwaechste Module",
+    ...metrics.weakModules.map((item) => `- ${item.modulId}: ${item.averageScore}% aus ${item.count} Notizen`)
+  ];
+  return lines.join("\n");
+}
+function buildLearningHubState(notes, materials, activePath, today = /* @__PURE__ */ new Date()) {
+  const metrics = calculateDashboardMetrics(notes, today);
+  const analyses = materials.map((material) => ({
+    path: material.path,
+    signals: analyzeStudyMaterial(material.markdown)
+  }));
+  const analysisMap = new Map(analyses.map((entry) => [entry.path, entry.signals]));
+  const usableStudyNotes = analyses.filter((entry) => entry.signals.readinessScore >= 4).length;
+  const weaklyStructuredNotes = analyses.length - usableStudyNotes;
+  const weakestModule = metrics.weakModules[0];
+  const dueReviewTitles = notes.filter((note) => note.next_review && parseDateOnly(note.next_review) <= today).slice(0, 3).map((note) => note.title);
+  const activeNote = activePath ? (() => {
+    const note = notes.find((entry) => entry.path === activePath);
+    const signals = analysisMap.get(activePath);
+    if (!note || !signals) {
+      return void 0;
+    }
+    return {
+      path: note.path,
+      title: note.title,
+      readinessScore: signals.readinessScore,
+      issues: signals.issues,
+      lernstatus: note.lernstatus ?? note.status,
+      dueReview: Boolean(note.next_review && parseDateOnly(note.next_review) <= today),
+      moduleId: note.modul_id
+    };
+  })() : void 0;
+  const recommendations = [];
+  if (metrics.dueReviews > 0) {
+    recommendations.push({
+      id: "review-queue",
+      title: "Faellige Wiederholungen zuerst",
+      reason: `${metrics.dueReviews} Notizen sind ueberfaellig. Das ist der sauberste Einstieg fuer heute.`,
+      emphasis: "urgent",
+      cta: "Review Queue \xF6ffnen"
+    });
+  }
+  if (activeNote && activeNote.readinessScore >= 4) {
+    recommendations.push({
+      id: "quiz-current",
+      title: "Aus der aktuellen Notiz ein Quiz ziehen",
+      reason: `"${activeNote.title}" ist strukturiert genug fuer brauchbare Fragen.`,
+      emphasis: activeNote.dueReview ? "steady" : "next",
+      cta: "Quiz zur Notiz"
+    });
+  }
+  if (activeNote && activeNote.readinessScore >= 5) {
+    recommendations.push({
+      id: "simulate-current",
+      title: "Die aktuelle Notiz unter Pruefungsdruck testen",
+      reason: "Genug Struktur fuer einen kurzen Simulationslauf ist vorhanden.",
+      emphasis: "next",
+      cta: "Pruefung starten"
+    });
+  }
+  if (weakestModule) {
+    recommendations.push({
+      id: "plan-week",
+      title: "Lernplan an den schw\xE4chsten Bereich anpassen",
+      reason: `${weakestModule.modulId} liegt aktuell bei ${weakestModule.averageScore}%. Das sollte in die naechste Woche eingeplant werden.`,
+      emphasis: "steady",
+      cta: "Lernplan pr\xFCfen"
+    });
+  }
+  recommendations.push({
+    id: "snapshot",
+    title: "Status sichern",
+    reason: "Ein Snapshot macht den Fortschritt sichtbar und haelt den Stand fest.",
+    emphasis: "steady",
+    cta: "Snapshot schreiben"
+  });
+  return {
+    metrics,
+    usableStudyNotes,
+    weaklyStructuredNotes,
+    weakestModule,
+    dueReviewTitles,
+    activeNote,
+    recommendations: dedupeRecommendations(recommendations).slice(0, 4)
+  };
+}
+function dedupeRecommendations(recommendations) {
+  const seen = /* @__PURE__ */ new Set();
+  const order = { urgent: 0, next: 1, steady: 2 };
+  return recommendations.filter((entry) => {
+    if (seen.has(entry.id)) {
+      return false;
+    }
+    seen.add(entry.id);
+    return true;
+  }).sort((left, right) => order[left.emphasis] - order[right.emphasis]);
 }
 
 // ../../packages/plugin-kit/src/index.ts
@@ -779,7 +871,7 @@ var DEFAULT_SETTINGS = {
 var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
   async onload() {
     await this.loadSettings();
-    this.addRibbonIcon("bar-chart-3", "Dashboard Live-Ansicht oeffnen", () => void this.openLiveDashboard());
+    this.addRibbonIcon("bar-chart-3", "Lernzentrale oeffnen", () => void this.openLiveDashboard());
     this.addCommand({
       id: "generate-dashboard-snapshot",
       name: "Dashboard: Snapshot generieren",
@@ -797,7 +889,7 @@ var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
     });
     this.addCommand({
       id: "open-live-dashboard",
-      name: "Dashboard: Live-Ansicht \xF6ffnen",
+      name: "Dashboard: Lernzentrale \xF6ffnen",
       callback: () => void this.openLiveDashboard()
     });
     this.addSettingTab(new BaseSettingsTab(this.app, this));
@@ -838,6 +930,7 @@ var LernfortschrittDashboardPlugin = class extends import_obsidian2.Plugin {
 var LiveDashboardModal = class extends import_obsidian2.Modal {
   constructor(app, plugin) {
     super(app);
+    this.scanned = [];
     this.plugin = plugin;
   }
   async onOpen() {
@@ -845,85 +938,227 @@ var LiveDashboardModal = class extends import_obsidian2.Modal {
     contentEl.empty();
     const shell = contentEl.createDiv({ cls: "live-dashboard-modal" });
     const header = shell.createDiv({ cls: "dashboard-header" });
-    header.createEl("h2", { text: "Live Lernfortschritt Dashboard" });
+    header.createEl("h2", { text: "Lernzentrale" });
+    header.createEl("p", {
+      text: "Ein Einstieg fuer reale Lernarbeit: heute sinnvoll, aktuelle Notiz, Review-Stau und schwache Module an einem Ort."
+    });
     const filters = shell.createDiv({ cls: "dashboard-filters" });
     const yearFilter = filters.createEl("select", { cls: "dashboard-filter" });
     yearFilter.createEl("option", { value: "all", text: "Alle Jahre" });
+    const hub = shell.createDiv({ cls: "learning-hub" });
+    const recommendations = hub.createDiv({ cls: "learning-hub__recommendations" });
+    const currentNote = hub.createDiv({ cls: "learning-hub__current-note" });
     const charts = shell.createDiv({ cls: "dashboard-charts" });
-    await this.loadMetrics();
-    this.renderFilters(yearFilter);
-    this.renderCharts(charts, yearFilter.value);
-    yearFilter.addEventListener("change", () => this.renderCharts(charts, yearFilter.value));
     const actions = shell.createDiv({ cls: "dashboard-actions" });
-    const snapshotBtn = actions.createEl("button", { cls: "mod-cta", text: "Snapshot erstellen" });
+    const snapshotBtn = actions.createEl("button", { text: "Snapshot schreiben" });
+    const reviewBtn = actions.createEl("button", { cls: "mod-cta", text: "Review Queue" });
+    const planBtn = actions.createEl("button", { text: "Lernplan" });
     const closeBtn = actions.createEl("button", { text: "Schlie\xDFen" });
+    await this.loadHubState();
+    this.renderFilters(yearFilter);
+    this.renderHub(recommendations, currentNote, yearFilter.value);
+    this.renderCharts(charts, yearFilter.value);
+    yearFilter.addEventListener("change", () => {
+      this.renderHub(recommendations, currentNote, yearFilter.value);
+      this.renderCharts(charts, yearFilter.value);
+    });
     snapshotBtn.addEventListener("click", async () => {
       await this.plugin.generateSnapshot();
       this.close();
     });
+    reviewBtn.addEventListener("click", () => void this.runCommand("spaced-repetition-engine:preview-review-queue"));
+    planBtn.addEventListener("click", () => void this.runCommand("lernplan-generator:preview-study-plan"));
     closeBtn.addEventListener("click", () => this.close());
   }
-  async loadMetrics() {
-    const scanned = await scanVault(this.app, this.plugin.settings.rootFolders);
-    this.metrics = calculateDashboardMetrics(scanned.map((entry) => entry.note));
+  async loadHubState() {
+    this.scanned = await scanVault(this.app, this.plugin.settings.rootFolders);
+    const activeFile = this.app.workspace.getActiveFile();
+    this.hubState = buildLearningHubState(
+      this.scanned.map((entry) => entry.note),
+      this.scanned.map((entry) => ({ path: entry.note.path, markdown: entry.markdown })),
+      activeFile?.path
+    );
   }
   renderFilters(yearFilter) {
-    Object.keys(this.metrics.byYear).forEach((year) => {
+    Object.keys(this.hubState.metrics.byYear).forEach((year) => {
       yearFilter.createEl("option", { value: year, text: year });
     });
   }
+  renderHub(recommendationsEl, currentNoteEl, yearFilter) {
+    recommendationsEl.empty();
+    currentNoteEl.empty();
+    const filtered = this.getFilteredState(yearFilter);
+    const hero = recommendationsEl.createDiv({ cls: "learning-hub__hero-card" });
+    hero.createDiv({ cls: "learning-hub__eyebrow", text: "Heute sinnvoll" });
+    hero.createEl("h3", { text: filtered.metrics.dueReviews > 0 ? "Erst den Review-Stau abbauen" : "Heute ist Raum fuer aktives Ueben" });
+    hero.createEl("p", {
+      text: filtered.metrics.dueReviews > 0 ? `Es gibt ${filtered.metrics.dueReviews} faellige Reviews. Das zuerst zu machen ist meist sinnvoller als neuer Stoff.` : "Kein grober Rueckstau sichtbar. Nutze die aktuelle Notiz fuer Quiz oder eine kurze Pruefungssimulation."
+    });
+    const grid = recommendationsEl.createDiv({ cls: "learning-hub__grid" });
+    filtered.recommendations.forEach((recommendation) => {
+      const card = grid.createDiv({ cls: `learning-hub__card learning-hub__card--${recommendation.emphasis}` });
+      card.createDiv({ cls: "learning-hub__card-kicker", text: this.getEmphasisLabel(recommendation.emphasis) });
+      card.createEl("h4", { text: recommendation.title });
+      card.createEl("p", { text: recommendation.reason });
+      const button = card.createEl("button", {
+        cls: recommendation.emphasis === "urgent" ? "mod-cta" : "",
+        text: recommendation.cta
+      });
+      button.addEventListener("click", () => void this.handleRecommendation(recommendation.id));
+    });
+    const noteCard = currentNoteEl.createDiv({ cls: "learning-hub__note-card" });
+    noteCard.createDiv({ cls: "learning-hub__eyebrow", text: "Aktuelle Notiz" });
+    if (!filtered.activeNote) {
+      noteCard.createEl("h3", { text: "Keine aktive Lernnotiz" });
+      noteCard.createEl("p", {
+        text: "Oeffne eine Lernnotiz. Dann kann die Lernzentrale direkt Quiz, Pruefung und Notizqualitaet auf diese Datei beziehen."
+      });
+      return;
+    }
+    noteCard.createEl("h3", { text: filtered.activeNote.title });
+    const chips = noteCard.createDiv({ cls: "learning-hub__chips" });
+    chips.createSpan({ cls: "learning-hub__chip", text: `Readiness ${filtered.activeNote.readinessScore}/6` });
+    if (filtered.activeNote.moduleId) {
+      chips.createSpan({ cls: "learning-hub__chip", text: filtered.activeNote.moduleId });
+    }
+    if (filtered.activeNote.lernstatus) {
+      chips.createSpan({ cls: "learning-hub__chip", text: filtered.activeNote.lernstatus });
+    }
+    if (filtered.activeNote.dueReview) {
+      chips.createSpan({ cls: "learning-hub__chip learning-hub__chip--urgent", text: "Review f\xE4llig" });
+    }
+    if (filtered.activeNote.issues.length > 0) {
+      noteCard.createEl("p", { text: "Damit die Note wirklich lernbar wird, sollte sie noch klarer werden:" });
+      const issueList = noteCard.createEl("ul", { cls: "learning-hub__issues" });
+      filtered.activeNote.issues.forEach((issue) => issueList.createEl("li", { text: issue }));
+    } else {
+      noteCard.createEl("p", { text: "Die Notiz ist strukturiert genug fuer Quiz und kurze Pruefungsl\xE4ufe." });
+    }
+    const noteActions = noteCard.createDiv({ cls: "learning-hub__note-actions" });
+    const quizBtn = noteActions.createEl("button", { cls: "mod-cta", text: "Quiz zur aktuellen Notiz" });
+    const examBtn = noteActions.createEl("button", { text: "Pruefung simulieren" });
+    quizBtn.disabled = filtered.activeNote.readinessScore < 4;
+    examBtn.disabled = filtered.activeNote.readinessScore < 4;
+    quizBtn.addEventListener("click", () => void this.runCommand("quiz-generator-markdown:preview-quiz-generation"));
+    examBtn.addEventListener("click", () => void this.runCommand("pruefungs-simulator:simulate-current-quiz"));
+  }
   renderCharts(container, yearFilter) {
     container.empty();
+    const filtered = this.getFilteredState(yearFilter);
+    const metrics = filtered.metrics;
     const statusChart = container.createDiv({ cls: "chart-card" });
     statusChart.createEl("h3", { text: "Lernstatus" });
-    const statusData = yearFilter === "all" ? this.metrics.byStatus : this.filterByYear(this.metrics.byYear, yearFilter).byStatus;
-    this.renderPieChart(statusChart, statusData);
+    this.renderPieChart(statusChart, metrics.byStatus);
     const progressCard = container.createDiv({ cls: "chart-card" });
     progressCard.createEl("h3", { text: "Gesamtfortschritt" });
-    const mastered = this.metrics.byStatus.beherrscht || 0;
-    const total = this.metrics.total;
-    this.renderProgressBar(progressCard, mastered, total);
-    const modulesCard = container.createDiv({ cls: "chart-card" });
-    modulesCard.createEl("h3", { text: "Schw\xE4chste Module" });
-    this.metrics.weakModules.slice(0, 3).forEach((module2) => {
-      const item = modulesCard.createDiv({ cls: "module-item" });
-      item.createSpan({ text: `${module2.modulId}: ${module2.averageScore}%` });
-      this.renderMiniProgressBar(item, module2.averageScore);
+    const mastered = metrics.byStatus.beherrscht || 0;
+    this.renderProgressBar(progressCard, mastered, metrics.total);
+    progressCard.createEl("p", {
+      cls: "chart-card__meta",
+      text: `${filtered.usableStudyNotes} gut nutzbare Lernnotizen, ${filtered.weaklyStructuredNotes} noch roh`
     });
-    if (mastered >= total * 0.5) {
+    const modulesCard = container.createDiv({ cls: "chart-card" });
+    modulesCard.createEl("h3", { text: "Schwaechste Module" });
+    if (metrics.weakModules.length === 0) {
+      modulesCard.createEl("p", { text: "Noch keine Score-Daten vorhanden." });
+    } else {
+      metrics.weakModules.slice(0, 3).forEach((module2) => {
+        const item = modulesCard.createDiv({ cls: "module-item" });
+        item.createSpan({ text: `${module2.modulId}: ${module2.averageScore}%` });
+        this.renderMiniProgressBar(item, module2.averageScore);
+      });
+    }
+    const reviewCard = container.createDiv({ cls: "chart-card" });
+    reviewCard.createEl("h3", { text: "Heute im Blick" });
+    reviewCard.createEl("p", { text: `${metrics.dueReviews} Reviews sind faellig.` });
+    if (filtered.dueReviewTitles.length > 0) {
+      const dueList = reviewCard.createEl("ul", { cls: "learning-hub__issues" });
+      filtered.dueReviewTitles.forEach((title) => dueList.createEl("li", { text: title }));
+    } else {
+      reviewCard.createEl("p", { text: "Kein Review-Stau sichtbar." });
+    }
+    if (mastered > 0 && metrics.total > 0 && mastered >= metrics.total * 0.5) {
       const celebration = container.createDiv({ cls: "celebration" });
-      celebration.createEl("p", { text: "\u{1F389} \xDCber 50% der Notizen beherrscht! Gut gemacht!" });
+      celebration.createEl("p", { text: "Mehr als die H\xE4lfte sitzt bereits. Jetzt lohnt sich Transfer und Pr\xFCfungssimulation." });
     }
   }
-  filterByYear(byYear, year) {
-    return this.metrics;
+  getFilteredState(yearFilter) {
+    if (yearFilter === "all") {
+      return this.hubState;
+    }
+    const filteredScanned = this.scanned.filter((entry) => (entry.note.ausbildungsjahr ?? "ohne-jahr") === yearFilter);
+    return buildLearningHubState(
+      filteredScanned.map((entry) => entry.note),
+      filteredScanned.map((entry) => ({ path: entry.note.path, markdown: entry.markdown })),
+      this.hubState.activeNote?.path
+    );
+  }
+  getEmphasisLabel(emphasis) {
+    if (emphasis === "urgent") {
+      return "Jetzt";
+    }
+    if (emphasis === "next") {
+      return "Als naechstes";
+    }
+    return "Nebenbei";
+  }
+  async handleRecommendation(id) {
+    if (id === "snapshot") {
+      await this.plugin.generateSnapshot();
+      return;
+    }
+    const commandMap = {
+      "review-queue": "spaced-repetition-engine:preview-review-queue",
+      "quiz-current": "quiz-generator-markdown:preview-quiz-generation",
+      "simulate-current": "pruefungs-simulator:simulate-current-quiz",
+      "plan-week": "lernplan-generator:preview-study-plan"
+    };
+    const commandId = commandMap[id];
+    if (commandId) {
+      await this.runCommand(commandId);
+    }
+  }
+  async runCommand(commandId) {
+    const commandsApi = this.app.commands;
+    const command = commandsApi?.findCommand(commandId);
+    if (!command) {
+      new import_obsidian2.Notice(`Aktion nicht verfuegbar: ${commandId}`);
+      return;
+    }
+    this.close();
+    await commandsApi.executeCommandById(commandId);
   }
   renderPieChart(container, data) {
-    const canvas = container.createEl("div", { cls: "pie-chart" });
-    const total = Object.values(data).reduce((sum, val) => sum + val, 0);
+    const total = Object.values(data).reduce((sum, value) => sum + value, 0);
+    if (total === 0) {
+      container.createEl("p", { text: "Noch keine Daten fuer diesen Filter." });
+      return;
+    }
+    const canvas = container.createDiv({ cls: "pie-chart" });
+    const legend = container.createDiv({ cls: "pie-legend" });
     let cumulative = 0;
-    const colors = ["#2f7d61", "#d97706", "#7d5a2f", "#b24a3f"];
-    let colorIndex = 0;
-    Object.entries(data).forEach(([label, value]) => {
-      const percentage = value / total * 100;
+    const colors = ["#2f7d61", "#d97706", "#7d5a2f", "#b24a3f", "#3f6bb2"];
+    Object.entries(data).forEach(([label, value], index) => {
       const segment = canvas.createDiv({ cls: "pie-segment" });
-      segment.style.background = colors[colorIndex % colors.length];
+      segment.style.background = colors[index % colors.length];
       segment.style.transform = `rotate(${cumulative}deg)`;
-      segment.style.clipPath = `polygon(0 0, 50% 0, 50% 100%, 0 100%)`;
-      const labelDiv = canvas.createDiv({ cls: "pie-label", text: `${label}: ${value}` });
-      cumulative += percentage * 3.6;
-      colorIndex++;
+      segment.style.clipPath = "polygon(50% 50%, 50% 0, 100% 0, 100% 100%)";
+      cumulative += value / total * 360;
+      const legendRow = legend.createDiv({ cls: "pie-legend__item" });
+      legendRow.createSpan({ cls: "pie-legend__swatch" }).style.background = colors[index % colors.length];
+      legendRow.createSpan({ text: `${label}: ${value}` });
     });
   }
   renderProgressBar(container, current, total) {
+    const safeTotal = total === 0 ? 1 : total;
     const bar = container.createDiv({ cls: "progress-bar" });
     const fill = bar.createDiv({ cls: "progress-fill" });
-    fill.style.width = `${current / total * 100}%`;
-    container.createEl("p", { text: `${current}/${total} beherrscht` });
+    fill.style.width = `${current / safeTotal * 100}%`;
+    container.createEl("p", { text: total === 0 ? "Noch keine Notizen im Filter." : `${current}/${total} beherrscht` });
   }
   renderMiniProgressBar(container, percentage) {
     const bar = container.createDiv({ cls: "mini-progress-bar" });
     const fill = bar.createDiv({ cls: "mini-progress-fill" });
-    fill.style.width = `${percentage}%`;
+    fill.style.width = `${Math.max(0, Math.min(percentage, 100))}%`;
   }
 };

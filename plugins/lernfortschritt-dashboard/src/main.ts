@@ -1,5 +1,5 @@
 import { Modal, Notice, Plugin } from "obsidian";
-import { analyzeStudyMaterial, calculateDashboardMetrics, renderDashboardMarkdown } from "@ausbildung/shared-core";
+import { analyzeStudyMaterial, buildLearningHubState, calculateDashboardMetrics, LearningHubState, renderDashboardMarkdown } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getDataviewApi, noticeSuccess, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface DashboardSettings extends BasePluginSettings {
@@ -11,12 +11,14 @@ const DEFAULT_SETTINGS: DashboardSettings = {
   snapshotFileName: "lernfortschritt-dashboard.md"
 };
 
+type ScanResult = Awaited<ReturnType<typeof scanVault>>[number];
+
 export default class LernfortschrittDashboardPlugin extends Plugin {
   settings!: DashboardSettings;
 
   async onload(): Promise<void> {
     await this.loadSettings();
-    this.addRibbonIcon("bar-chart-3", "Dashboard Live-Ansicht oeffnen", () => void this.openLiveDashboard());
+    this.addRibbonIcon("bar-chart-3", "Lernzentrale oeffnen", () => void this.openLiveDashboard());
     this.addCommand({
       id: "generate-dashboard-snapshot",
       name: "Dashboard: Snapshot generieren",
@@ -34,7 +36,7 @@ export default class LernfortschrittDashboardPlugin extends Plugin {
     });
     this.addCommand({
       id: "open-live-dashboard",
-      name: "Dashboard: Live-Ansicht öffnen",
+      name: "Dashboard: Lernzentrale öffnen",
       callback: () => void this.openLiveDashboard()
     });
     this.addSettingTab(new BaseSettingsTab(this.app, this));
@@ -53,7 +55,9 @@ export default class LernfortschrittDashboardPlugin extends Plugin {
     const metrics = calculateDashboardMetrics(scanned.map((entry) => entry.note));
     const readyCount = scanned.filter((entry) => analyzeStudyMaterial(entry.markdown).readinessScore >= 4).length;
     const dataviewApi = getDataviewApi(this, this.settings.useDataview);
-    const dataviewHint = dataviewApi ? "\n\n> Dataview erkannt: Live-Abfragen koennen in dieser Snapshot-Note ergaenzt werden.\n" : "\n\n> Dataview nicht aktiv: Snapshot basiert auf sicherem Vault-Scan.\n";
+    const dataviewHint = dataviewApi
+      ? "\n\n> Dataview erkannt: Live-Abfragen koennen in dieser Snapshot-Note ergaenzt werden.\n"
+      : "\n\n> Dataview nicht aktiv: Snapshot basiert auf sicherem Vault-Scan.\n";
     const content = `${renderDashboardMarkdown(metrics)}\n\n## Materialqualitaet\n- Gut nutzbare Lernnotizen: ${readyCount}\n- Noch duenn strukturierte Notizen: ${metrics.total - readyCount}${dataviewHint}`;
     const path = await writePluginOutput(this.app, this.settings.dashboardFolder, this.settings.snapshotFileName, content);
     noticeSuccess(`Dashboard geschrieben: ${path}`);
@@ -76,7 +80,8 @@ export default class LernfortschrittDashboardPlugin extends Plugin {
 
 class LiveDashboardModal extends Modal {
   private plugin: LernfortschrittDashboardPlugin;
-  private metrics: any;
+  private scanned: ScanResult[] = [];
+  private hubState!: LearningHubState;
 
   constructor(app: Plugin["app"], plugin: LernfortschrittDashboardPlugin) {
     super(app);
@@ -88,113 +93,268 @@ class LiveDashboardModal extends Modal {
     contentEl.empty();
     const shell = contentEl.createDiv({ cls: "live-dashboard-modal" });
 
-    // Header
     const header = shell.createDiv({ cls: "dashboard-header" });
-    header.createEl("h2", { text: "Live Lernfortschritt Dashboard" });
+    header.createEl("h2", { text: "Lernzentrale" });
+    header.createEl("p", {
+      text: "Ein Einstieg fuer reale Lernarbeit: heute sinnvoll, aktuelle Notiz, Review-Stau und schwache Module an einem Ort."
+    });
 
-    // Filters
     const filters = shell.createDiv({ cls: "dashboard-filters" });
     const yearFilter = filters.createEl("select", { cls: "dashboard-filter" });
     yearFilter.createEl("option", { value: "all", text: "Alle Jahre" });
 
-    // Charts container
+    const hub = shell.createDiv({ cls: "learning-hub" });
+    const recommendations = hub.createDiv({ cls: "learning-hub__recommendations" });
+    const currentNote = hub.createDiv({ cls: "learning-hub__current-note" });
     const charts = shell.createDiv({ cls: "dashboard-charts" });
 
-    // Load data
-    await this.loadMetrics();
+    const actions = shell.createDiv({ cls: "dashboard-actions" });
+    const snapshotBtn = actions.createEl("button", { text: "Snapshot schreiben" });
+    const reviewBtn = actions.createEl("button", { cls: "mod-cta", text: "Review Queue" });
+    const planBtn = actions.createEl("button", { text: "Lernplan" });
+    const closeBtn = actions.createEl("button", { text: "Schließen" });
+
+    await this.loadHubState();
     this.renderFilters(yearFilter);
+    this.renderHub(recommendations, currentNote, yearFilter.value);
     this.renderCharts(charts, yearFilter.value);
 
-    yearFilter.addEventListener("change", () => this.renderCharts(charts, yearFilter.value));
-
-    // Actions
-    const actions = shell.createDiv({ cls: "dashboard-actions" });
-    const snapshotBtn = actions.createEl("button", { cls: "mod-cta", text: "Snapshot erstellen" });
-    const closeBtn = actions.createEl("button", { text: "Schließen" });
+    yearFilter.addEventListener("change", () => {
+      this.renderHub(recommendations, currentNote, yearFilter.value);
+      this.renderCharts(charts, yearFilter.value);
+    });
 
     snapshotBtn.addEventListener("click", async () => {
       await this.plugin.generateSnapshot();
       this.close();
     });
+    reviewBtn.addEventListener("click", () => void this.runCommand("spaced-repetition-engine:preview-review-queue"));
+    planBtn.addEventListener("click", () => void this.runCommand("lernplan-generator:preview-study-plan"));
     closeBtn.addEventListener("click", () => this.close());
   }
 
-  private async loadMetrics(): Promise<void> {
-    const scanned = await scanVault(this.app, this.plugin.settings.rootFolders);
-    this.metrics = calculateDashboardMetrics(scanned.map((entry) => entry.note));
+  private async loadHubState(): Promise<void> {
+    this.scanned = await scanVault(this.app, this.plugin.settings.rootFolders);
+    const activeFile = this.app.workspace.getActiveFile();
+    this.hubState = buildLearningHubState(
+      this.scanned.map((entry) => entry.note),
+      this.scanned.map((entry) => ({ path: entry.note.path, markdown: entry.markdown })),
+      activeFile?.path
+    );
   }
 
   private renderFilters(yearFilter: HTMLSelectElement): void {
-    Object.keys(this.metrics.byYear).forEach(year => {
+    Object.keys(this.hubState.metrics.byYear).forEach((year) => {
       yearFilter.createEl("option", { value: year, text: year });
     });
   }
 
-  private renderCharts(container: HTMLElement, yearFilter: string): void {
-    container.empty();
+  private renderHub(recommendationsEl: HTMLElement, currentNoteEl: HTMLElement, yearFilter: string): void {
+    recommendationsEl.empty();
+    currentNoteEl.empty();
 
-    // Status chart
-    const statusChart = container.createDiv({ cls: "chart-card" });
-    statusChart.createEl("h3", { text: "Lernstatus" });
-    const statusData = yearFilter === "all" ? this.metrics.byStatus : this.filterByYear(this.metrics.byYear, yearFilter).byStatus;
-    this.renderPieChart(statusChart, statusData);
-
-    // Progress bar for total
-    const progressCard = container.createDiv({ cls: "chart-card" });
-    progressCard.createEl("h3", { text: "Gesamtfortschritt" });
-    const mastered = this.metrics.byStatus.beherrscht || 0;
-    const total = this.metrics.total;
-    this.renderProgressBar(progressCard, mastered, total);
-
-    // Weak modules
-    const modulesCard = container.createDiv({ cls: "chart-card" });
-    modulesCard.createEl("h3", { text: "Schwächste Module" });
-    this.metrics.weakModules.slice(0, 3).forEach((module: any) => {
-      const item = modulesCard.createDiv({ cls: "module-item" });
-      item.createSpan({ text: `${module.modulId}: ${module.averageScore}%` });
-      this.renderMiniProgressBar(item, module.averageScore);
+    const filtered = this.getFilteredState(yearFilter);
+    const hero = recommendationsEl.createDiv({ cls: "learning-hub__hero-card" });
+    hero.createDiv({ cls: "learning-hub__eyebrow", text: "Heute sinnvoll" });
+    hero.createEl("h3", { text: filtered.metrics.dueReviews > 0 ? "Erst den Review-Stau abbauen" : "Heute ist Raum fuer aktives Ueben" });
+    hero.createEl("p", {
+      text: filtered.metrics.dueReviews > 0
+        ? `Es gibt ${filtered.metrics.dueReviews} faellige Reviews. Das zuerst zu machen ist meist sinnvoller als neuer Stoff.`
+        : "Kein grober Rueckstau sichtbar. Nutze die aktuelle Notiz fuer Quiz oder eine kurze Pruefungssimulation."
     });
 
-    // Milestone celebration
-    if (mastered >= total * 0.5) {
+    const grid = recommendationsEl.createDiv({ cls: "learning-hub__grid" });
+    filtered.recommendations.forEach((recommendation) => {
+      const card = grid.createDiv({ cls: `learning-hub__card learning-hub__card--${recommendation.emphasis}` });
+      card.createDiv({ cls: "learning-hub__card-kicker", text: this.getEmphasisLabel(recommendation.emphasis) });
+      card.createEl("h4", { text: recommendation.title });
+      card.createEl("p", { text: recommendation.reason });
+      const button = card.createEl("button", {
+        cls: recommendation.emphasis === "urgent" ? "mod-cta" : "",
+        text: recommendation.cta
+      });
+      button.addEventListener("click", () => void this.handleRecommendation(recommendation.id));
+    });
+
+    const noteCard = currentNoteEl.createDiv({ cls: "learning-hub__note-card" });
+    noteCard.createDiv({ cls: "learning-hub__eyebrow", text: "Aktuelle Notiz" });
+    if (!filtered.activeNote) {
+      noteCard.createEl("h3", { text: "Keine aktive Lernnotiz" });
+      noteCard.createEl("p", {
+        text: "Oeffne eine Lernnotiz. Dann kann die Lernzentrale direkt Quiz, Pruefung und Notizqualitaet auf diese Datei beziehen."
+      });
+      return;
+    }
+
+    noteCard.createEl("h3", { text: filtered.activeNote.title });
+    const chips = noteCard.createDiv({ cls: "learning-hub__chips" });
+    chips.createSpan({ cls: "learning-hub__chip", text: `Readiness ${filtered.activeNote.readinessScore}/6` });
+    if (filtered.activeNote.moduleId) {
+      chips.createSpan({ cls: "learning-hub__chip", text: filtered.activeNote.moduleId });
+    }
+    if (filtered.activeNote.lernstatus) {
+      chips.createSpan({ cls: "learning-hub__chip", text: filtered.activeNote.lernstatus });
+    }
+    if (filtered.activeNote.dueReview) {
+      chips.createSpan({ cls: "learning-hub__chip learning-hub__chip--urgent", text: "Review fällig" });
+    }
+
+    if (filtered.activeNote.issues.length > 0) {
+      noteCard.createEl("p", { text: "Damit die Note wirklich lernbar wird, sollte sie noch klarer werden:" });
+      const issueList = noteCard.createEl("ul", { cls: "learning-hub__issues" });
+      filtered.activeNote.issues.forEach((issue) => issueList.createEl("li", { text: issue }));
+    } else {
+      noteCard.createEl("p", { text: "Die Notiz ist strukturiert genug fuer Quiz und kurze Pruefungsläufe." });
+    }
+
+    const noteActions = noteCard.createDiv({ cls: "learning-hub__note-actions" });
+    const quizBtn = noteActions.createEl("button", { cls: "mod-cta", text: "Quiz zur aktuellen Notiz" });
+    const examBtn = noteActions.createEl("button", { text: "Pruefung simulieren" });
+    quizBtn.disabled = filtered.activeNote.readinessScore < 4;
+    examBtn.disabled = filtered.activeNote.readinessScore < 4;
+    quizBtn.addEventListener("click", () => void this.runCommand("quiz-generator-markdown:preview-quiz-generation"));
+    examBtn.addEventListener("click", () => void this.runCommand("pruefungs-simulator:simulate-current-quiz"));
+  }
+
+  private renderCharts(container: HTMLElement, yearFilter: string): void {
+    container.empty();
+    const filtered = this.getFilteredState(yearFilter);
+    const metrics = filtered.metrics;
+
+    const statusChart = container.createDiv({ cls: "chart-card" });
+    statusChart.createEl("h3", { text: "Lernstatus" });
+    this.renderPieChart(statusChart, metrics.byStatus);
+
+    const progressCard = container.createDiv({ cls: "chart-card" });
+    progressCard.createEl("h3", { text: "Gesamtfortschritt" });
+    const mastered = metrics.byStatus.beherrscht || 0;
+    this.renderProgressBar(progressCard, mastered, metrics.total);
+    progressCard.createEl("p", {
+      cls: "chart-card__meta",
+      text: `${filtered.usableStudyNotes} gut nutzbare Lernnotizen, ${filtered.weaklyStructuredNotes} noch roh`
+    });
+
+    const modulesCard = container.createDiv({ cls: "chart-card" });
+    modulesCard.createEl("h3", { text: "Schwaechste Module" });
+    if (metrics.weakModules.length === 0) {
+      modulesCard.createEl("p", { text: "Noch keine Score-Daten vorhanden." });
+    } else {
+      metrics.weakModules.slice(0, 3).forEach((module) => {
+        const item = modulesCard.createDiv({ cls: "module-item" });
+        item.createSpan({ text: `${module.modulId}: ${module.averageScore}%` });
+        this.renderMiniProgressBar(item, module.averageScore);
+      });
+    }
+
+    const reviewCard = container.createDiv({ cls: "chart-card" });
+    reviewCard.createEl("h3", { text: "Heute im Blick" });
+    reviewCard.createEl("p", { text: `${metrics.dueReviews} Reviews sind faellig.` });
+    if (filtered.dueReviewTitles.length > 0) {
+      const dueList = reviewCard.createEl("ul", { cls: "learning-hub__issues" });
+      filtered.dueReviewTitles.forEach((title) => dueList.createEl("li", { text: title }));
+    } else {
+      reviewCard.createEl("p", { text: "Kein Review-Stau sichtbar." });
+    }
+
+    if (mastered > 0 && metrics.total > 0 && mastered >= metrics.total * 0.5) {
       const celebration = container.createDiv({ cls: "celebration" });
-      celebration.createEl("p", { text: "🎉 Über 50% der Notizen beherrscht! Gut gemacht!" });
+      celebration.createEl("p", { text: "Mehr als die Hälfte sitzt bereits. Jetzt lohnt sich Transfer und Prüfungssimulation." });
     }
   }
 
-  private filterByYear(byYear: any, year: string): any {
-    // Simplified: assume all notes are included for now
-    return this.metrics;
+  private getFilteredState(yearFilter: string): LearningHubState {
+    if (yearFilter === "all") {
+      return this.hubState;
+    }
+
+    const filteredScanned = this.scanned.filter((entry) => (entry.note.ausbildungsjahr ?? "ohne-jahr") === yearFilter);
+    return buildLearningHubState(
+      filteredScanned.map((entry) => entry.note),
+      filteredScanned.map((entry) => ({ path: entry.note.path, markdown: entry.markdown })),
+      this.hubState.activeNote?.path
+    );
+  }
+
+  private getEmphasisLabel(emphasis: "urgent" | "next" | "steady"): string {
+    if (emphasis === "urgent") {
+      return "Jetzt";
+    }
+    if (emphasis === "next") {
+      return "Als naechstes";
+    }
+    return "Nebenbei";
+  }
+
+  private async handleRecommendation(id: string): Promise<void> {
+    if (id === "snapshot") {
+      await this.plugin.generateSnapshot();
+      return;
+    }
+
+    const commandMap: Record<string, string> = {
+      "review-queue": "spaced-repetition-engine:preview-review-queue",
+      "quiz-current": "quiz-generator-markdown:preview-quiz-generation",
+      "simulate-current": "pruefungs-simulator:simulate-current-quiz",
+      "plan-week": "lernplan-generator:preview-study-plan"
+    };
+    const commandId = commandMap[id];
+    if (commandId) {
+      await this.runCommand(commandId);
+    }
+  }
+
+  private async runCommand(commandId: string): Promise<void> {
+    const commandsApi = (this.app as Plugin["app"] & {
+      commands?: {
+        findCommand: (id: string) => unknown;
+        executeCommandById: (id: string) => Promise<boolean> | boolean;
+      };
+    }).commands;
+    const command = commandsApi?.findCommand(commandId);
+    if (!command) {
+      new Notice(`Aktion nicht verfuegbar: ${commandId}`);
+      return;
+    }
+    this.close();
+    await commandsApi!.executeCommandById(commandId);
   }
 
   private renderPieChart(container: HTMLElement, data: Record<string, number>): void {
-    const canvas = container.createEl("div", { cls: "pie-chart" });
-    const total = Object.values(data).reduce((sum: number, val: number) => sum + val, 0);
+    const total = Object.values(data).reduce((sum, value) => sum + value, 0);
+    if (total === 0) {
+      container.createEl("p", { text: "Noch keine Daten fuer diesen Filter." });
+      return;
+    }
+
+    const canvas = container.createDiv({ cls: "pie-chart" });
+    const legend = container.createDiv({ cls: "pie-legend" });
     let cumulative = 0;
-    const colors = ['#2f7d61', '#d97706', '#7d5a2f', '#b24a3f'];
-    let colorIndex = 0;
-    Object.entries(data).forEach(([label, value]) => {
-      const percentage = (value as number) / total * 100;
+    const colors = ["#2f7d61", "#d97706", "#7d5a2f", "#b24a3f", "#3f6bb2"];
+
+    Object.entries(data).forEach(([label, value], index) => {
       const segment = canvas.createDiv({ cls: "pie-segment" });
-      segment.style.background = colors[colorIndex % colors.length];
+      segment.style.background = colors[index % colors.length];
       segment.style.transform = `rotate(${cumulative}deg)`;
-      segment.style.clipPath = `polygon(0 0, 50% 0, 50% 100%, 0 100%)`;
-      const labelDiv = canvas.createDiv({ cls: "pie-label", text: `${label}: ${value}` });
-      cumulative += percentage * 3.6; // 3.6 degrees per percent
-      colorIndex++;
+      segment.style.clipPath = "polygon(50% 50%, 50% 0, 100% 0, 100% 100%)";
+      cumulative += (value / total) * 360;
+
+      const legendRow = legend.createDiv({ cls: "pie-legend__item" });
+      legendRow.createSpan({ cls: "pie-legend__swatch" }).style.background = colors[index % colors.length];
+      legendRow.createSpan({ text: `${label}: ${value}` });
     });
   }
 
   private renderProgressBar(container: HTMLElement, current: number, total: number): void {
+    const safeTotal = total === 0 ? 1 : total;
     const bar = container.createDiv({ cls: "progress-bar" });
     const fill = bar.createDiv({ cls: "progress-fill" });
-    fill.style.width = `${(current / total) * 100}%`;
-    container.createEl("p", { text: `${current}/${total} beherrscht` });
+    fill.style.width = `${(current / safeTotal) * 100}%`;
+    container.createEl("p", { text: total === 0 ? "Noch keine Notizen im Filter." : `${current}/${total} beherrscht` });
   }
 
   private renderMiniProgressBar(container: HTMLElement, percentage: number): void {
     const bar = container.createDiv({ cls: "mini-progress-bar" });
     const fill = bar.createDiv({ cls: "mini-progress-fill" });
-    fill.style.width = `${percentage}%`;
+    fill.style.width = `${Math.max(0, Math.min(percentage, 100))}%`;
   }
 }
