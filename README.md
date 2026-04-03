@@ -45,6 +45,19 @@ What it does not include:
 
 The example vault is intentionally small and artificial. It exists for reproducible tests and screenshots.
 
+## What the project feels like right now
+
+The repo is still a mono-repo full of separate plugins, but the intended entry point is no longer "figure out which command to run".
+
+The dashboard plugin now acts as a small learner-first hub:
+
+- it checks what is due
+- it points at weak modules
+- it looks at the currently open note and decides whether quiz or exam generation makes sense
+- it lets you jump straight into `Review Queue`, `Quiz`, `Prüfung`, or `Lernplan`
+
+That shift matters. For actual studying, "what should I do next?" is the real question. The repo is finally starting to answer that directly.
+
 ## Shared foundation
 
 All plugins in the repo work against the same file-based learning model:
@@ -87,7 +100,7 @@ flowchart TD
 
 These are the most advanced plugins in the repository, but the repository as a whole is still WIP.
 
-- `lernfortschritt-dashboard`
+- `lernfortschritt-dashboard` now doubles as the central learner-facing hub
 - `pruefungs-simulator`
 - `lernplan-generator`
 
@@ -135,6 +148,8 @@ python3 scripts/package_releases.py
 ```
 
 For manual QA, use the test vault and verify the resulting markdown inside Obsidian.
+
+For day-to-day vault testing, the dashboard ribbon is the best first click. That is where the repo now ties note quality, review pressure, quiz readiness, and weak modules together.
 
 For AI-backed features, also verify:
 

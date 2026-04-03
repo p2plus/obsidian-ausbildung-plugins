@@ -44,6 +44,8 @@ python3 scripts/install_plugin.py --plugin lernfortschritt-dashboard --vault "/p
 
 4. Enable the plugins in Obsidian.
 
+If you are not sure where to start after that, click the dashboard ribbon icon first. The dashboard is the current front door into the stack, not just a report generator.
+
 ## First useful setup
 
 For a normal user, the fastest path is:
@@ -51,7 +53,8 @@ For a normal user, the fastest path is:
 1. Keep existing markdown notes in the vault.
 2. In each plugin, leave `rootFolders` empty to scan the whole vault, or point it at one learning area.
 3. Add YAML front matter only to the notes that matter first.
-4. Use commands to generate outputs.
+4. Open the dashboard ribbon icon once and check the next-step suggestions there.
+5. Use commands or direct jumps from the dashboard to generate outputs.
 
 Useful commands:
 
