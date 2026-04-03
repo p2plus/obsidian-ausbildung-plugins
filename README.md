@@ -56,6 +56,7 @@ The dashboard plugin now acts as a small learner-first hub:
 - it looks at the currently open note and decides whether quiz or exam generation makes sense
 - it lets you jump straight into `Review Queue`, `Quiz`, `Prüfung`, or `Lernplan`
 - it now also includes a `Vault Doctor` for metadata gaps, broken review dates, and notes that are still too raw for local quiz logic
+- and it can now clean up a chunk of that routine metadata damage with built-in `Quick Fixes`
 
 That shift matters. For actual studying, "what should I do next?" is the real question. The repo is finally starting to answer that directly.
 

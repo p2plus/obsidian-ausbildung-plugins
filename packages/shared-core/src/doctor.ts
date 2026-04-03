@@ -1,5 +1,5 @@
-import { parseDateOnly, parseFrontmatter } from "./notes";
-import { LearningNote, VaultDoctorIssue, VaultDoctorReport } from "./types";
+import { parseDateOnly, removeYamlField, updateYamlField, parseFrontmatter } from "./notes";
+import { LearningNote, VaultDoctorFixResult, VaultDoctorIssue, VaultDoctorReport } from "./types";
 import { analyzeStudyMaterial } from "./study-material";
 
 const VALID_LERNSTATUS = new Set(["neu", "gelesen", "geuebt", "sicher", "beherrscht"]);
@@ -122,6 +122,64 @@ export function renderVaultDoctorMarkdown(report: VaultDoctorReport): string {
   return lines.join("\n");
 }
 
+export function applyVaultDoctorFixes(note: LearningNote, markdown: string, today = new Date()): VaultDoctorFixResult {
+  let updated = markdown;
+  const applied: string[] = [];
+  const frontmatter = parseFrontmatter(markdown);
+
+  if (Object.keys(frontmatter).length === 0 || !note.lernstatus || !VALID_LERNSTATUS.has(note.lernstatus)) {
+    updated = updateYamlField(updated, "lernstatus", "neu");
+    applied.push("lernstatus auf neu gesetzt");
+  }
+
+  if (!note.lerntyp || !VALID_LERNTYP.has(note.lerntyp)) {
+    updated = updateYamlField(updated, "lerntyp", inferLerntyp(note));
+    applied.push("lerntyp normalisiert");
+  }
+
+  if (!note.pruefungsrelevanz || !VALID_PRUEFUNGSRELEVANZ.has(note.pruefungsrelevanz)) {
+    updated = updateYamlField(updated, "pruefungsrelevanz", "mittel");
+    applied.push("pruefungsrelevanz auf mittel gesetzt");
+  }
+
+  if (note.score_last !== undefined && (note.score_last < 0 || note.score_last > 100)) {
+    updated = updateYamlField(updated, "score_last", clampScore(note.score_last));
+    applied.push("score_last auf 0-100 begrenzt");
+  }
+
+  if (note.score_best !== undefined && (note.score_best < 0 || note.score_best > 100)) {
+    updated = updateYamlField(updated, "score_best", clampScore(note.score_best));
+    applied.push("score_best auf 0-100 begrenzt");
+  }
+
+  if (note.time_estimate_min !== undefined && note.time_estimate_min <= 0) {
+    updated = removeYamlField(updated, "time_estimate_min");
+    applied.push("time_estimate_min entfernt");
+  }
+
+  const lastReview = note.last_review ? safeDate(note.last_review) : undefined;
+  const nextReview = note.next_review ? safeDate(note.next_review) : undefined;
+  if (note.last_review && !lastReview) {
+    updated = removeYamlField(updated, "last_review");
+    applied.push("ungueltiges last_review entfernt");
+  }
+  if (note.next_review && !nextReview) {
+    updated = removeYamlField(updated, "next_review");
+    applied.push("ungueltiges next_review entfernt");
+  }
+  if (lastReview && nextReview && nextReview < lastReview) {
+    updated = updateYamlField(updated, "next_review", note.last_review!);
+    applied.push("next_review auf last_review angehoben");
+  }
+
+  if (note.next_review && nextReview && nextReview < today && !note.last_review) {
+    updated = updateYamlField(updated, "last_review", today.toISOString().slice(0, 10));
+    applied.push("fehlendes last_review auf heute gesetzt");
+  }
+
+  return { markdown: updated, applied };
+}
+
 function safeDate(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return null;
@@ -138,4 +196,25 @@ function makeIssue(note: LearningNote, severity: VaultDoctorIssue["severity"], c
     code,
     message
   };
+}
+
+function inferLerntyp(note: LearningNote): string {
+  const haystack = `${note.path} ${note.title}`.toLowerCase();
+  if (haystack.includes("quiz")) {
+    return "quiz";
+  }
+  if (haystack.includes("pruefung") || haystack.includes("exam")) {
+    return "pruefung";
+  }
+  if (haystack.includes("uebung") || haystack.includes("exercise")) {
+    return "uebung";
+  }
+  if (haystack.includes("review")) {
+    return "review";
+  }
+  return "theorie";
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }

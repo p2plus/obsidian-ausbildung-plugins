@@ -140,6 +140,22 @@ ${markdown}`;
   }
   return markdown;
 }
+function removeYamlField(markdown, key) {
+  const lines = markdown.split(/\r?\n/);
+  if (lines[0]?.trim() !== FRONTMATTER_DELIMITER) {
+    return markdown;
+  }
+  for (let index = 1; index < lines.length; index += 1) {
+    if (lines[index].trim() === FRONTMATTER_DELIMITER) {
+      break;
+    }
+    if (lines[index].startsWith(`${key}:`)) {
+      lines.splice(index, 1);
+      break;
+    }
+  }
+  return lines.join("\n");
+}
 function parseDateOnly(dateText) {
   return /* @__PURE__ */ new Date(`${dateText}T12:00:00`);
 }
@@ -464,6 +480,54 @@ function renderVaultDoctorMarkdown(report) {
   }
   return lines.join("\n");
 }
+function applyVaultDoctorFixes(note, markdown, today = /* @__PURE__ */ new Date()) {
+  let updated = markdown;
+  const applied = [];
+  const frontmatter = parseFrontmatter(markdown);
+  if (Object.keys(frontmatter).length === 0 || !note.lernstatus || !VALID_LERNSTATUS.has(note.lernstatus)) {
+    updated = updateYamlField(updated, "lernstatus", "neu");
+    applied.push("lernstatus auf neu gesetzt");
+  }
+  if (!note.lerntyp || !VALID_LERNTYP.has(note.lerntyp)) {
+    updated = updateYamlField(updated, "lerntyp", inferLerntyp(note));
+    applied.push("lerntyp normalisiert");
+  }
+  if (!note.pruefungsrelevanz || !VALID_PRUEFUNGSRELEVANZ.has(note.pruefungsrelevanz)) {
+    updated = updateYamlField(updated, "pruefungsrelevanz", "mittel");
+    applied.push("pruefungsrelevanz auf mittel gesetzt");
+  }
+  if (note.score_last !== void 0 && (note.score_last < 0 || note.score_last > 100)) {
+    updated = updateYamlField(updated, "score_last", clampScore(note.score_last));
+    applied.push("score_last auf 0-100 begrenzt");
+  }
+  if (note.score_best !== void 0 && (note.score_best < 0 || note.score_best > 100)) {
+    updated = updateYamlField(updated, "score_best", clampScore(note.score_best));
+    applied.push("score_best auf 0-100 begrenzt");
+  }
+  if (note.time_estimate_min !== void 0 && note.time_estimate_min <= 0) {
+    updated = removeYamlField(updated, "time_estimate_min");
+    applied.push("time_estimate_min entfernt");
+  }
+  const lastReview = note.last_review ? safeDate(note.last_review) : void 0;
+  const nextReview = note.next_review ? safeDate(note.next_review) : void 0;
+  if (note.last_review && !lastReview) {
+    updated = removeYamlField(updated, "last_review");
+    applied.push("ungueltiges last_review entfernt");
+  }
+  if (note.next_review && !nextReview) {
+    updated = removeYamlField(updated, "next_review");
+    applied.push("ungueltiges next_review entfernt");
+  }
+  if (lastReview && nextReview && nextReview < lastReview) {
+    updated = updateYamlField(updated, "next_review", note.last_review);
+    applied.push("next_review auf last_review angehoben");
+  }
+  if (note.next_review && nextReview && nextReview < today && !note.last_review) {
+    updated = updateYamlField(updated, "last_review", today.toISOString().slice(0, 10));
+    applied.push("fehlendes last_review auf heute gesetzt");
+  }
+  return { markdown: updated, applied };
+}
 function safeDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return null;
@@ -479,6 +543,25 @@ function makeIssue(note, severity, code, message) {
     code,
     message
   };
+}
+function inferLerntyp(note) {
+  const haystack = `${note.path} ${note.title}`.toLowerCase();
+  if (haystack.includes("quiz")) {
+    return "quiz";
+  }
+  if (haystack.includes("pruefung") || haystack.includes("exam")) {
+    return "pruefung";
+  }
+  if (haystack.includes("uebung") || haystack.includes("exercise")) {
+    return "uebung";
+  }
+  if (haystack.includes("review")) {
+    return "review";
+  }
+  return "theorie";
+}
+function clampScore(value) {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 // ../../packages/plugin-kit/src/index.ts
@@ -1333,19 +1416,63 @@ var VaultDoctorModal = class extends import_obsidian2.Modal {
     });
     const cards = shell.createDiv({ cls: "dashboard-charts" });
     const preview = shell.createDiv({ cls: "learning-hub__note-card" });
+    this.cardsEl = cards;
+    this.previewEl = preview;
     const actions = shell.createDiv({ cls: "dashboard-actions" });
+    const fixBtn = actions.createEl("button", { text: "Quick fixes anwenden" });
     const saveBtn = actions.createEl("button", { cls: "mod-cta", text: "Bericht schreiben" });
     const closeBtn = actions.createEl("button", { text: "Schlie\xDFen" });
+    this.fixBtn = fixBtn;
     closeBtn.addEventListener("click", () => this.close());
-    const report = await this.plugin.buildDoctorReport();
-    this.renderSummary(cards, report);
-    this.renderIssues(preview, report);
+    await this.refreshReport();
+    fixBtn.addEventListener("click", () => void this.applyQuickFixes());
     saveBtn.addEventListener("click", async () => {
       const path = await this.plugin.writeDoctorReport();
       noticeSuccess(`Vault Doctor geschrieben: ${path}`);
       await openOutputFile(this.app, path, true);
       this.close();
     });
+  }
+  async refreshReport() {
+    if (!this.cardsEl || !this.previewEl || !this.fixBtn) {
+      return;
+    }
+    this.report = await this.plugin.buildDoctorReport();
+    this.renderSummary(this.cardsEl, this.report);
+    this.renderIssues(this.previewEl, this.report);
+    this.fixBtn.disabled = !this.report.issues.some((issue) => this.isFixable(issue.code));
+  }
+  async applyQuickFixes() {
+    if (!this.fixBtn) {
+      return;
+    }
+    this.fixBtn.disabled = true;
+    const scanned = await scanVault(this.app, this.plugin.settings.rootFolders);
+    let changed = 0;
+    for (const entry of scanned) {
+      const result = applyVaultDoctorFixes(entry.note, entry.markdown);
+      if (result.applied.length > 0 && result.markdown !== entry.markdown) {
+        await this.app.vault.modify(entry.file, result.markdown);
+        changed += 1;
+      }
+    }
+    noticeSuccess(changed > 0 ? `${changed} Notizen mit sicheren Quick Fixes aktualisiert.` : "Keine sicheren Quick Fixes gefunden.");
+    await this.refreshReport();
+  }
+  isFixable(code) {
+    return [
+      "missing-frontmatter",
+      "missing-lernstatus",
+      "missing-lerntyp",
+      "missing-pruefungsrelevanz",
+      "invalid-lernstatus",
+      "invalid-lerntyp",
+      "invalid-pruefungsrelevanz",
+      "invalid-review-date",
+      "review-order",
+      "invalid-score",
+      "invalid-time-estimate"
+    ].includes(code);
   }
   renderSummary(container, report) {
     const scanned = container.createDiv({ cls: "chart-card" });

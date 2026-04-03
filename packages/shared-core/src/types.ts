@@ -104,6 +104,11 @@ export interface VaultDoctorReport {
   byCode: Record<string, number>;
 }
 
+export interface VaultDoctorFixResult {
+  markdown: string;
+  applied: string[];
+}
+
 export interface ExamQuestion {
   id: string;
   prompt: string;

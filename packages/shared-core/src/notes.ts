@@ -95,6 +95,23 @@ export function updateYamlField(markdown: string, key: string, value: string | n
   return markdown;
 }
 
+export function removeYamlField(markdown: string, key: string): string {
+  const lines = markdown.split(/\r?\n/);
+  if (lines[0]?.trim() !== FRONTMATTER_DELIMITER) {
+    return markdown;
+  }
+  for (let index = 1; index < lines.length; index += 1) {
+    if (lines[index].trim() === FRONTMATTER_DELIMITER) {
+      break;
+    }
+    if (lines[index].startsWith(`${key}:`)) {
+      lines.splice(index, 1);
+      break;
+    }
+  }
+  return lines.join("\n");
+}
+
 export function parseDateOnly(dateText: string): Date {
   return new Date(`${dateText}T12:00:00`);
 }

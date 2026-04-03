@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAnalyticsAiRequest,
   buildLearningHubState,
+  applyVaultDoctorFixes,
   analyzeStudyMaterial,
   buildKeywordGapAiRequest,
   buildQuizAiRequest,
@@ -88,6 +89,16 @@ describe("shared core", () => {
     expect(report.issues.some((issue) => issue.code === "missing-frontmatter")).toBe(true);
     expect(report.issues.some((issue) => issue.code === "weak-structure")).toBe(true);
     expect(renderVaultDoctorMarkdown(report)).toContain("Vault Doctor");
+  });
+
+  it("applies safe vault doctor quick fixes", () => {
+    const raw = `# Roh\nEin einzelner Freitextsatz ohne Struktur.`;
+    const note = parseLearningNote("Lernen/quiz-beispiel.md", raw);
+    const fixed = applyVaultDoctorFixes(note, raw, new Date("2026-03-30T00:00:00Z"));
+    expect(fixed.applied.length).toBeGreaterThan(0);
+    expect(fixed.markdown).toContain('lernstatus: "neu"');
+    expect(fixed.markdown).toContain('lerntyp: "quiz"');
+    expect(fixed.markdown).toContain('pruefungsrelevanz: "mittel"');
   });
 
   it("grades exam attempts", () => {

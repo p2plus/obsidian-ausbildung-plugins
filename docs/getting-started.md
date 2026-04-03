@@ -46,6 +46,8 @@ python3 scripts/install_plugin.py --plugin lernfortschritt-dashboard --vault "/p
 
 If you are not sure where to start after that, click the dashboard ribbon icon first. The dashboard is the current front door into the stack, not just a report generator.
 
+If the vault already feels messy, open `Vault Doctor` from there before you do anything else. The new `Quick Fixes` button handles a good part of the repetitive metadata cleanup.
+
 ## First useful setup
 
 For a normal user, the fastest path is:

@@ -20,6 +20,7 @@ flowchart LR
 
 - gives you a proper `Lernzentrale` instead of just another report button
 - includes a built-in `Vault Doctor` for rough edges in metadata, review dates, and note structure
+- can apply safe `Quick Fixes` for the boring stuff: missing defaults, broken enum values, invalid review dates, and bad score ranges
 - counts progress by `lernstatus` and `ausbildungsjahr`
 - highlights weak modules based on recorded scores
 - shows due reviews without forcing a separate review system
@@ -39,6 +40,7 @@ flowchart LR
 - use the current-note panel to see whether the open note is quiz-ready or still too raw
 - drop into `Quiz`, `Prüfung`, `Review Queue`, or `Lernplan` directly from there
 - run `Vault Doctor` when a vault feels noisy, inconsistent, or oddly unhelpful
+- use `Quick Fixes` when the doctor findings are mostly housekeeping and not real content work
 
 ## Manual QA
 

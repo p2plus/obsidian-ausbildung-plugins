@@ -1,5 +1,5 @@
 import { Modal, Notice, Plugin } from "obsidian";
-import { analyzeStudyMaterial, buildLearningHubState, calculateDashboardMetrics, LearningHubState, renderDashboardMarkdown, renderVaultDoctorMarkdown, runVaultDoctor, VaultDoctorReport } from "@ausbildung/shared-core";
+import { analyzeStudyMaterial, applyVaultDoctorFixes, buildLearningHubState, calculateDashboardMetrics, LearningHubState, renderDashboardMarkdown, renderVaultDoctorMarkdown, runVaultDoctor, VaultDoctorReport } from "@ausbildung/shared-core";
 import { BasePluginSettings, BaseSettingsTab, DEFAULT_BASE_SETTINGS, getDataviewApi, noticeSuccess, openOutputFile, scanVault, updateLearningStatus, writePluginOutput } from "@ausbildung/plugin-kit";
 
 interface DashboardSettings extends BasePluginSettings {
@@ -393,6 +393,10 @@ class LiveDashboardModal extends Modal {
 
 class VaultDoctorModal extends Modal {
   private plugin: LernfortschrittDashboardPlugin;
+  private cardsEl?: HTMLElement;
+  private previewEl?: HTMLElement;
+  private fixBtn?: HTMLButtonElement;
+  private report?: VaultDoctorReport;
 
   constructor(app: Plugin["app"], plugin: LernfortschrittDashboardPlugin) {
     super(app);
@@ -411,14 +415,18 @@ class VaultDoctorModal extends Modal {
 
     const cards = shell.createDiv({ cls: "dashboard-charts" });
     const preview = shell.createDiv({ cls: "learning-hub__note-card" });
+    this.cardsEl = cards;
+    this.previewEl = preview;
     const actions = shell.createDiv({ cls: "dashboard-actions" });
+    const fixBtn = actions.createEl("button", { text: "Quick fixes anwenden" });
     const saveBtn = actions.createEl("button", { cls: "mod-cta", text: "Bericht schreiben" });
     const closeBtn = actions.createEl("button", { text: "Schließen" });
+    this.fixBtn = fixBtn;
     closeBtn.addEventListener("click", () => this.close());
 
-    const report = await this.plugin.buildDoctorReport();
-    this.renderSummary(cards, report);
-    this.renderIssues(preview, report);
+    await this.refreshReport();
+
+    fixBtn.addEventListener("click", () => void this.applyQuickFixes());
 
     saveBtn.addEventListener("click", async () => {
       const path = await this.plugin.writeDoctorReport();
@@ -426,6 +434,50 @@ class VaultDoctorModal extends Modal {
       await openOutputFile(this.app, path, true);
       this.close();
     });
+  }
+
+  private async refreshReport(): Promise<void> {
+    if (!this.cardsEl || !this.previewEl || !this.fixBtn) {
+      return;
+    }
+    this.report = await this.plugin.buildDoctorReport();
+    this.renderSummary(this.cardsEl, this.report);
+    this.renderIssues(this.previewEl, this.report);
+    this.fixBtn.disabled = !this.report.issues.some((issue) => this.isFixable(issue.code));
+  }
+
+  private async applyQuickFixes(): Promise<void> {
+    if (!this.fixBtn) {
+      return;
+    }
+    this.fixBtn.disabled = true;
+    const scanned = await scanVault(this.app, this.plugin.settings.rootFolders);
+    let changed = 0;
+    for (const entry of scanned) {
+      const result = applyVaultDoctorFixes(entry.note, entry.markdown);
+      if (result.applied.length > 0 && result.markdown !== entry.markdown) {
+        await this.app.vault.modify(entry.file, result.markdown);
+        changed += 1;
+      }
+    }
+    noticeSuccess(changed > 0 ? `${changed} Notizen mit sicheren Quick Fixes aktualisiert.` : "Keine sicheren Quick Fixes gefunden.");
+    await this.refreshReport();
+  }
+
+  private isFixable(code: string): boolean {
+    return [
+      "missing-frontmatter",
+      "missing-lernstatus",
+      "missing-lerntyp",
+      "missing-pruefungsrelevanz",
+      "invalid-lernstatus",
+      "invalid-lerntyp",
+      "invalid-pruefungsrelevanz",
+      "invalid-review-date",
+      "review-order",
+      "invalid-score",
+      "invalid-time-estimate"
+    ].includes(code);
   }
 
   private renderSummary(container: HTMLElement, report: VaultDoctorReport): void {
